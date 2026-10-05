@@ -181,3 +181,92 @@ export interface BloodBankNotification {
   read: boolean;
   urgency?: 'high' | 'medium' | 'low';
 }
+
+export interface GovernmentUser {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  department: string;
+  state: string;
+  district: string;
+  designation: string;
+  role: 'state_admin' | 'national_admin' | 'nodal_officer';
+  verifiedAt: string;
+}
+
+export interface HospitalApplication {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  contact: string;
+  email: string;
+  address: string;
+  bedCapacity: number;
+  icuCapacity: string;
+  bloodBankLinked: string;
+  linkedBloodBankId?: string;
+  applicationDate: string;
+  status: 'Pending' | 'Verified' | 'Rejected' | 'Under Review';
+  rejectionReason?: string;
+  documents: { name: string; type: string; status: 'Verified' | 'Pending' | 'Uploaded'; url?: string }[];
+  auditLog: { action: string; by: string; date: string; note?: string }[];
+  stock?: Record<string, number>;
+  requirements?: Record<string, { required: number; available: number; urgency: string }>;
+}
+
+export interface BloodHotspot {
+  id: string;
+  city: string;
+  state: string;
+  severity: 'Critical' | 'High' | 'Moderate' | 'Stable';
+  totalShortage: number;
+  patientsAffected: number;
+  hospitalsAffected: number;
+  mostRequiredGroup: string;
+  bloodGroupShortages: Record<string, { required: number; available: number; urgency: 'Critical' | 'High' | 'Moderate' }>;
+  urgencyWindow: string;
+  lastUpdated: string;
+  actionPlan?: string;
+}
+
+export interface DonationRecord {
+  id: string;
+  donorName: string;
+  bloodGroup: string;
+  units: number;
+  city: string;
+  state: string;
+  centerName: string;
+  date: string;
+  donationType: 'Emergency Dispatch' | 'Voluntary Camp' | 'Walk-In Regular' | 'Plateletpheresis';
+  status: 'Stored' | 'Dispatched' | 'Tested';
+}
+
+export interface RegionalBloodSupply {
+  id: string;
+  region: string;
+  state: string;
+  requiredUnits: number;
+  availableUnits: number;
+  shortage: number;
+  surplus: number;
+  criticalGroups: string[];
+  hospitalCount: number;
+  bloodBankCount: number;
+  status: 'critical' | 'low' | 'healthy';
+  supplyCoverage: number;
+}
+
+export interface GovernmentAlert {
+  id: string;
+  title: string;
+  description: string;
+  severity: 'critical' | 'warning' | 'info';
+  region: string;
+  time: string;
+  hotspotId?: string;
+  hospitalId?: string;
+  resolved: boolean;
+}
