@@ -284,4 +284,21 @@ export interface GovernmentAlert {
   resolved: boolean;
 }
 
+export interface HospitalDonorPledge {
+  id: string;
+  hospitalId: string;
+  hospitalName: string;
+  donorName: string;
+  phone: string;
+  age: number;
+  gender: string;
+  bloodGroup: string;
+  preferredSlot: string; // e.g. "Immediately / Within 2 hours", "Today", "Tomorrow", "Weekend"
+  eligibilityConfirmed: boolean;
+  status: 'Pending Contact' | 'Contacted' | 'Scheduled' | 'Fulfilled' | 'Cancelled';
+  timestamp: string;
+  unitsDonated?: number;
+  notes?: string;
+}
+
 

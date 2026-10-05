@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Building2, 
@@ -12,9 +12,17 @@ import {
   Send, 
   LogOut,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  HeartHandshake,
+  Phone,
+  Calendar,
+  Clock,
+  Search,
+  Check
 } from 'lucide-react';
 import { REGISTERED_HOSPITALS } from '../../data/mockData';
+import { getHospitalDonorPledges, updatePledgeStatus } from '../../utils/hospitalDonorPledgeStore';
+import type { HospitalDonorPledge } from '../../types';
 
 export const HospitalDashboard = () => {
   const { hospitalId } = useParams<{ hospitalId: string }>();
@@ -33,7 +41,61 @@ export const HospitalDashboard = () => {
   const [reqWard, setReqWard] = useState('OT-3 (Trauma Emergency)');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'inventory' | 'requisitions' | 'transfers' | 'radar'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'donors' | 'requisitions' | 'transfers' | 'radar'>('inventory');
+
+  // Donor Pledges State (Scoped to current hospital)
+  const [pledges, setPledges] = useState<HospitalDonorPledge[]>(() =>
+    hospital ? getHospitalDonorPledges(hospital.id) : []
+  );
+  const [donorFilterStatus, setDonorFilterStatus] = useState<string>('all');
+  const [donorFilterGroup, setDonorFilterGroup] = useState<string>('all');
+  const [donorSearchQuery, setDonorSearchQuery] = useState<string>('');
+
+  useEffect(() => {
+    if (!hospital?.id) return;
+    const loadPledges = () => {
+      setPledges(getHospitalDonorPledges(hospital.id));
+    };
+    loadPledges();
+
+    const handlePledgeUpdate = () => {
+      loadPledges();
+    };
+    window.addEventListener('hemovite_donor_pledges_updated', handlePledgeUpdate);
+    window.addEventListener('storage', handlePledgeUpdate);
+
+    return () => {
+      window.removeEventListener('hemovite_donor_pledges_updated', handlePledgeUpdate);
+      window.removeEventListener('storage', handlePledgeUpdate);
+    };
+  }, [hospital?.id]);
+
+  // Donor Pledge Actions
+  const handleMarkContacted = (pledge: HospitalDonorPledge) => {
+    if (!hospital) return;
+    updatePledgeStatus(pledge.id, 'Contacted', 'Coordinator contacted donor via phone. Donor confirmed willingness.');
+    setPledges(getHospitalDonorPledges(hospital.id));
+    triggerToast(`Donor ${pledge.donorName} (${pledge.bloodGroup}) marked as Contacted.`);
+  };
+
+  const handleScheduleDonation = (pledge: HospitalDonorPledge) => {
+    if (!hospital) return;
+    updatePledgeStatus(pledge.id, 'Scheduled', 'Appointment scheduled at hospital blood collection station.');
+    setPledges(getHospitalDonorPledges(hospital.id));
+    triggerToast(`Donation scheduled with ${pledge.donorName} (${pledge.bloodGroup}).`);
+  };
+
+  const handleMarkFulfilled = (pledge: HospitalDonorPledge) => {
+    if (!hospital) return;
+    updatePledgeStatus(pledge.id, 'Fulfilled', 'Blood successfully collected, screened, and placed in cold reserve.');
+    // Replenish the on-site reserve / shortage metric for that blood group
+    setStockState((prev) => ({
+      ...prev,
+      [pledge.bloodGroup]: (prev[pledge.bloodGroup] || 0) + 1,
+    }));
+    setPledges(getHospitalDonorPledges(hospital.id));
+    triggerToast(`Donation fulfilled! +1 Unit added to ${pledge.bloodGroup} reserve (${(stockState[pledge.bloodGroup] || 0) + 1} Units total).`);
+  };
 
   // Simulated transfer actions
   const [transfers, setTransfers] = useState([
@@ -227,15 +289,45 @@ export const HospitalDashboard = () => {
         {/* SECTION TABS */}
         <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto">
           {[
-            { id: 'inventory', label: 'Ward Inventory Ledger' },
-            { id: 'requisitions', label: 'Emergency Requisition Broadcast' },
-            { id: 'transfers', label: 'Inter-Facility Transfers (2 Active)' },
-            { id: 'radar', label: 'AI Shortage Radar' },
+            { 
+              id: 'inventory', 
+              label: <span>Ward Inventory Ledger</span> 
+            },
+            { 
+              id: 'donors', 
+              label: (
+                <span className="flex items-center gap-2">
+                  <HeartHandshake className="w-4 h-4 text-brand-bright" />
+                  <span>Incoming Donor Pledges</span>
+                  {pledges.filter((p) => p.status === 'Pending Contact').length > 0 ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white animate-pulse">
+                      {pledges.filter((p) => p.status === 'Pending Contact').length} New
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-300">
+                      {pledges.length}
+                    </span>
+                  )}
+                </span>
+              )
+            },
+            { 
+              id: 'requisitions', 
+              label: <span>Emergency Requisition Broadcast</span> 
+            },
+            { 
+              id: 'transfers', 
+              label: <span>Inter-Facility Transfers (2 Active)</span> 
+            },
+            { 
+              id: 'radar', 
+              label: <span>AI Shortage Radar</span> 
+            },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                 activeTab === tab.id
                   ? 'bg-brand-red text-white shadow-md'
                   : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'
@@ -261,7 +353,7 @@ export const HospitalDashboard = () => {
 
                 <button
                   onClick={() => triggerToast('Inventory data re-synchronized with hospital EHR system.')}
-                  className="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs text-slate-300 hover:text-white flex items-center gap-1.5 self-start sm:self-auto"
+                  className="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs text-slate-300 hover:text-white flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
                   <span>Sync EHR Feed</span>
@@ -314,7 +406,7 @@ export const HospitalDashboard = () => {
                             }));
                             triggerToast(`Issued 1 Unit of ${groupKey} to ward.`);
                           }}
-                          className="text-slate-400 hover:text-red-400 font-bold px-2 py-1 bg-white/5 rounded"
+                          className="text-slate-400 hover:text-red-400 font-bold px-2 py-1 bg-white/5 rounded cursor-pointer"
                         >
                           - Issue
                         </button>
@@ -326,7 +418,7 @@ export const HospitalDashboard = () => {
                             }));
                             triggerToast(`Added 1 Unit of ${groupKey} to stock.`);
                           }}
-                          className="text-emerald-400 hover:text-emerald-300 font-bold px-2 py-1 bg-white/5 rounded"
+                          className="text-emerald-400 hover:text-emerald-300 font-bold px-2 py-1 bg-white/5 rounded cursor-pointer"
                         >
                           + Add
                         </button>
@@ -335,6 +427,382 @@ export const HospitalDashboard = () => {
                   );
                 })}
               </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* 2. INCOMING DONOR PLEDGES / VOLUNTEER DONORS PANEL */}
+        {activeTab === 'donors' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="bg-[#111827] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+              
+              {/* HEADER & SUMMARY METRICS */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-5">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                      <HeartHandshake className="w-5 h-5 text-brand-bright" />
+                      <span>Incoming Donor Pledges &amp; Volunteer Dispatch</span>
+                    </h3>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-500/50">
+                      Facility: {hospital.id}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Direct citizen donor offers pledged for <strong>{hospital.name}</strong> to resolve emergency shortages.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+                    Auto-Refreshed
+                  </span>
+                  <button
+                    onClick={() => {
+                      setPledges(getHospitalDonorPledges(hospital.id));
+                      triggerToast('Donor pledges reloaded from secure storage.');
+                    }}
+                    className="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Refresh Offers</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 STAT SUMMARY CARDS */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {/* Total Pledges */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Total Pledged Offers
+                  </span>
+                  <div className="text-2xl font-black text-white font-mono">
+                    {pledges.length}
+                  </div>
+                  <p className="text-[10px] text-slate-400">Targeted for this hospital</p>
+                </div>
+
+                {/* Pending Contact */}
+                <div className="bg-red-950/30 border border-red-500/40 rounded-2xl p-4 space-y-1">
+                  <span className="text-[10px] font-bold text-red-300 uppercase tracking-wider block">
+                    Pending Contact
+                  </span>
+                  <div className="text-2xl font-black text-brand-bright font-mono flex items-center gap-2">
+                    <span>{pledges.filter((p) => p.status === 'Pending Contact').length}</span>
+                    {pledges.filter((p) => p.status === 'Pending Contact').length > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-600 text-white animate-pulse font-sans">
+                        Action Required
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-red-300/80">Awaiting coordinator call</p>
+                </div>
+
+                {/* Scheduled Appointments */}
+                <div className="bg-blue-950/30 border border-blue-500/30 rounded-2xl p-4 space-y-1">
+                  <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">
+                    Scheduled Donations
+                  </span>
+                  <div className="text-2xl font-black text-blue-400 font-mono">
+                    {pledges.filter((p) => p.status === 'Scheduled').length}
+                  </div>
+                  <p className="text-[10px] text-blue-300/80">Slot booked at station</p>
+                </div>
+
+                {/* Fulfilled / Collected */}
+                <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-2xl p-4 space-y-1">
+                  <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">
+                    Fulfilled / Stocked
+                  </span>
+                  <div className="text-2xl font-black text-emerald-400 font-mono">
+                    {pledges.filter((p) => p.status === 'Fulfilled').length}
+                  </div>
+                  <p className="text-[10px] text-emerald-300/80">Units added to reserve</p>
+                </div>
+              </div>
+
+              {/* FILTER & SEARCH TOOLBAR */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white/5 border border-white/10 p-3 rounded-2xl">
+                {/* Search */}
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={donorSearchQuery}
+                    onChange={(e) => setDonorSearchQuery(e.target.value)}
+                    placeholder="Search donor name, phone number, or notes..."
+                    className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-red"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  {/* Status Filter */}
+                  <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-white/10 text-xs">
+                    {[
+                      { id: 'all', label: 'All' },
+                      { id: 'pending contact', label: 'Pending' },
+                      { id: 'contacted', label: 'Contacted' },
+                      { id: 'scheduled', label: 'Scheduled' },
+                      { id: 'fulfilled', label: 'Fulfilled' }
+                    ].map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => setDonorFilterStatus(st.id)}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition-all text-[11px] cursor-pointer ${
+                          donorFilterStatus === st.id
+                            ? 'bg-brand-red text-white'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {st.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Blood Group Filter */}
+                  <select
+                    value={donorFilterGroup}
+                    onChange={(e) => setDonorFilterGroup(e.target.value)}
+                    className="px-2.5 py-1.5 bg-slate-900 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-brand-red"
+                  >
+                    <option value="all">All Groups</option>
+                    {['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'].map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* PLEDGES TABLE */}
+              {pledges.filter((p) => {
+                const matchesStatus = donorFilterStatus === 'all' || p.status.toLowerCase() === donorFilterStatus;
+                const matchesGroup = donorFilterGroup === 'all' || p.bloodGroup === donorFilterGroup;
+                const query = donorSearchQuery.toLowerCase();
+                const matchesSearch = !donorSearchQuery || 
+                  p.donorName.toLowerCase().includes(query) ||
+                  p.phone.toLowerCase().includes(query) ||
+                  p.bloodGroup.toLowerCase().includes(query) ||
+                  (p.notes && p.notes.toLowerCase().includes(query));
+
+                return matchesStatus && matchesGroup && matchesSearch;
+              }).length === 0 ? (
+                <div className="py-12 text-center bg-white/5 border border-white/10 rounded-2xl p-6 space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center mx-auto">
+                    <HeartHandshake className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-white">No Donor Pledges Found</h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    {donorSearchQuery || donorFilterStatus !== 'all' || donorFilterGroup !== 'all'
+                      ? 'No donor pledges match your active filters. Try clearing your search or filters.'
+                      : 'No citizen pledges currently recorded for this hospital ID. Offers submitted on the Hospital Detail page will appear here in real-time.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/5">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-white/5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="py-3 px-4">Donor &amp; ID</th>
+                        <th className="py-3 px-4">Blood Group</th>
+                        <th className="py-3 px-4">Phone Contact</th>
+                        <th className="py-3 px-4">Availability Slot</th>
+                        <th className="py-3 px-4">Pledged At</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Coordinator Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {pledges.filter((p) => {
+                        const matchesStatus = donorFilterStatus === 'all' || p.status.toLowerCase() === donorFilterStatus;
+                        const matchesGroup = donorFilterGroup === 'all' || p.bloodGroup === donorFilterGroup;
+                        const query = donorSearchQuery.toLowerCase();
+                        const matchesSearch = !donorSearchQuery || 
+                          p.donorName.toLowerCase().includes(query) ||
+                          p.phone.toLowerCase().includes(query) ||
+                          p.bloodGroup.toLowerCase().includes(query) ||
+                          (p.notes && p.notes.toLowerCase().includes(query));
+
+                        return matchesStatus && matchesGroup && matchesSearch;
+                      }).map((pledge) => {
+                        const isPending = pledge.status === 'Pending Contact';
+                        const isContacted = pledge.status === 'Contacted';
+                        const isScheduled = pledge.status === 'Scheduled';
+                        const isFulfilled = pledge.status === 'Fulfilled';
+
+                        return (
+                          <tr
+                            key={pledge.id}
+                            className={`hover:bg-white/5 transition-colors ${
+                              isPending ? 'bg-red-950/15' : ''
+                            }`}
+                          >
+                            {/* Donor & ID */}
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-0.5">
+                                <div className="font-bold text-white text-sm flex items-center gap-1.5">
+                                  <span>{pledge.donorName}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                                  <span className="font-mono text-slate-400">{pledge.id}</span>
+                                  <span>•</span>
+                                  <span>{pledge.age} yrs, {pledge.gender}</span>
+                                </div>
+                                {pledge.notes && (
+                                  <p className="text-[10px] text-slate-400 italic max-w-xs truncate" title={pledge.notes}>
+                                    "{pledge.notes}"
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Blood Group */}
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-br from-brand-red to-brand-deep text-white font-mono font-black text-xs shadow-sm">
+                                <Droplet className="w-3 h-3 fill-current" />
+                                <span>{pledge.bloodGroup}</span>
+                              </span>
+                            </td>
+
+                            {/* Phone */}
+                            <td className="py-3.5 px-4">
+                              <a
+                                href={`tel:${pledge.phone}`}
+                                className="inline-flex items-center gap-1 text-slate-200 hover:text-brand-bright font-mono font-bold bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-lg border border-white/10 transition-colors"
+                              >
+                                <Phone className="w-3 h-3 text-emerald-400" />
+                                <span>{pledge.phone}</span>
+                              </a>
+                            </td>
+
+                            {/* Availability Slot */}
+                            <td className="py-3.5 px-4">
+                              <div className="inline-flex items-center gap-1 text-slate-300 font-medium bg-white/5 px-2.5 py-1 rounded-lg">
+                                <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                                <span>{pledge.preferredSlot}</span>
+                              </div>
+                            </td>
+
+                            {/* Pledged At */}
+                            <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
+                              {pledge.timestamp}
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-3.5 px-4">
+                              {isPending && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-950 text-red-300 border border-red-500/50">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                  <span>Pending Contact</span>
+                                </span>
+                              )}
+                              {isContacted && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-950 text-blue-300 border border-blue-500/40">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                  <span>Contacted</span>
+                                </span>
+                              )}
+                              {isScheduled && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-500/40">
+                                  <Calendar className="w-3 h-3 text-purple-400" />
+                                  <span>Scheduled</span>
+                                </span>
+                              )}
+                              {isFulfilled && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                  <span>Fulfilled (+1 Stock)</span>
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Action Buttons */}
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                {isPending && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMarkContacted(pledge)}
+                                      className="px-2.5 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                      title="Mark donor as contacted"
+                                    >
+                                      <Phone className="w-3 h-3" />
+                                      <span>Mark Contacted</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleScheduleDonation(pledge)}
+                                      className="px-2.5 py-1 bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                      title="Schedule donation appointment"
+                                    >
+                                      <Calendar className="w-3 h-3" />
+                                      <span>Schedule</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMarkFulfilled(pledge)}
+                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                      title="Mark blood collected and increment reserve stock"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      <span>Fulfilled</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {isContacted && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleScheduleDonation(pledge)}
+                                      className="px-2.5 py-1 bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                      title="Schedule donation appointment"
+                                    >
+                                      <Calendar className="w-3 h-3" />
+                                      <span>Schedule</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMarkFulfilled(pledge)}
+                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                      title="Mark blood collected and increment reserve stock"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      <span>Fulfilled</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {isScheduled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMarkFulfilled(pledge)}
+                                    className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                                    title="Complete blood collection and add 1 unit to hospital inventory"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Complete &amp; Add Unit</span>
+                                  </button>
+                                )}
+
+                                {isFulfilled && (
+                                  <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/50 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                                    <Check className="w-3 h-3" />
+                                    <span>Added to {pledge.bloodGroup} Reserve</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
             </div>
           </div>

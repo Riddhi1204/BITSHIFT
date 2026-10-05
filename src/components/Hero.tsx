@@ -62,7 +62,7 @@ export const Hero = ({ onSelectRole: _onSelectRole, onOpenEmergency }: HeroProps
   };
 
   return (
-    <section id="hero" className="relative pt-28 pb-16 md:pt-36 md:pb-24 bg-gradient-to-b from-[#0B1220] via-[#0D1829] to-[#111827] text-white overflow-hidden">
+    <section id="hero" className="relative pt-6 pb-16 md:pt-10 md:pb-24 bg-gradient-to-b from-[#0D1829] via-[#0E1B2E] to-[#111827] text-white overflow-hidden">
       
       {/* BACKGROUND AMBIENT GLOWS & GRID */}
       <div className="absolute inset-0 bg-hero-grid opacity-20 pointer-events-none" />

@@ -1,3 +1,4 @@
+import { PromoBanner } from '../components/PromoBanner';
 import { Hero } from '../components/Hero';
 import { FeatureStrip } from '../components/FeatureStrip';
 import { AboutAppSection } from '../components/AboutAppSection';
@@ -18,6 +19,9 @@ interface HomeProps {
 export const Home = ({ onSelectRole, onOpenEmergency, onOpenFinder }: HomeProps) => {
   return (
     <main className="min-h-screen">
+      {/* 0. PROMOTIONAL / COVER BANNER */}
+      <PromoBanner />
+
       {/* 1. HERO BANNER: 2-COLUMN WITH HEADLINE ON LEFT & HOSPITAL SHORTAGE RISK MONITOR ON RIGHT */}
       <Hero 
         onSelectRole={onSelectRole} 

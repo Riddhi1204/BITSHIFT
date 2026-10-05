@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   Building2, 
@@ -16,14 +17,20 @@ import {
   Layers,
   ArrowRight,
   ExternalLink,
-  Lock
+  Lock,
+  X
 } from 'lucide-react';
 import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
 import { getRegisteredHospitals } from '../../utils/hospitalVerificationStore';
+import { HospitalDonorPledgeModal } from '../../components/modals/HospitalDonorPledgeModal';
 
 export const HospitalDetails = () => {
   const { hospitalId } = useParams<{ hospitalId: string }>();
   const navigate = useNavigate();
+
+  const [pledgeModalOpen, setPledgeModalOpen] = useState(false);
+  const [selectedPledgeGroup, setSelectedPledgeGroup] = useState<string>('O-');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const hospitals = getRegisteredHospitals();
   const hospital = hospitals.find((h) => h.id === hospitalId);
@@ -467,7 +474,11 @@ export const HospitalDetails = () => {
                 </span>
 
                 <button
-                  onClick={() => navigate(`/donate?hospitalId=${hospital.id}`)}
+                  onClick={() => {
+                    const firstEmergency = emergencyRequirements.length > 0 ? emergencyRequirements[0][0] : 'O-';
+                    setSelectedPledgeGroup(firstEmergency);
+                    setPledgeModalOpen(true);
+                  }}
                   className="px-4 py-2 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-black text-xs rounded-xl shadow-md hover:shadow-glow-red hover:-translate-y-0.5 flex items-center justify-center gap-1.5 transition-all w-full sm:w-auto shrink-0 group cursor-pointer"
                 >
                   <Droplet className="w-3.5 h-3.5 fill-current text-white group-hover:scale-110 transition-transform" />
@@ -921,6 +932,47 @@ export const HospitalDetails = () => {
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
         © 2026 HemoVite. All Rights Reserved. • National Blood Availability & Shortage Prediction Network
       </footer>
+
+      {/* DONOR PLEDGE MODAL */}
+      <HospitalDonorPledgeModal
+        isOpen={pledgeModalOpen}
+        onClose={() => setPledgeModalOpen(false)}
+        hospitalId={hospital.id}
+        hospitalName={hospital.name}
+        defaultGroup={selectedPledgeGroup}
+        emergencyGroups={emergencyRequirements.map(([grp]) => grp)}
+        onSuccess={(_donorName, _bloodGroup) => {
+          setToastMessage(
+            "Thank you for stepping up! Hospital coordinators have received your donation offer and will contact you shortly."
+          );
+          setTimeout(() => {
+            setToastMessage(null);
+          }, 6000);
+        }}
+      />
+
+      {/* SUCCESS TOAST NOTIFICATION */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-[#0B1220] border border-emerald-500/60 rounded-2xl p-4 shadow-2xl text-white flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-300">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/40">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <div className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
+              Pledge Transmitted Successfully
+            </div>
+            <p className="text-xs text-slate-200 leading-snug">
+              {toastMessage}
+            </p>
+          </div>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-white text-xs font-bold p-1 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
     </div>
   );
