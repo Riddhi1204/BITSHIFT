@@ -80,10 +80,11 @@ export const BloodBankDetails = () => {
 
           <button
             onClick={() => navigate(`/blood-bank/${bloodBank.id}/auth`)}
-            className="px-4 py-2 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-white/15 flex items-center gap-1.5 transition-all"
+            title="Authorized staff portal"
           >
             <Lock className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Admin Portal</span>
+            <span className="hidden sm:inline">Staff Access</span>
           </button>
         </div>
       </header>
@@ -147,23 +148,6 @@ export const BloodBankDetails = () => {
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* ADMIN LOGIN CTA BOX */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 shrink-0 lg:max-w-xs w-full backdrop-blur-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase font-bold text-slate-400">Administration</span>
-                <Lock className="w-4 h-4 text-brand-bright" />
-              </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Authorized blood bank administrators can log in to update inventory, accept requisitions, and record donations.
-              </p>
-              <button
-                onClick={() => navigate(`/blood-bank/${bloodBank.id}/auth`)}
-                className="w-full py-3 px-4 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-2 transition-all"
-              >
-                <span>Administrator Login / Register</span>
-              </button>
             </div>
           </div>
 

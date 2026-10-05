@@ -11,7 +11,8 @@ import {
   Globe, 
   PhoneCall, 
   Award,
-  ArrowRight
+  ArrowRight,
+  Lock
 } from 'lucide-react';
 import { REGISTERED_BLOOD_BANKS, MOCK_NGO_PARTNERS } from '../../data/mockData';
 import { BloodBankCard } from '../../components/bloodbank/BloodBankCard';
@@ -155,6 +156,18 @@ export const BloodBankList = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* STAFF ACCESS BUTTON */}
+            <Link
+              to="/blood-bank/staff-login"
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/15 hover:border-white/25 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-brand-red/50"
+              aria-label="Blood bank staff access portal"
+              title="Authorized blood bank staff login"
+            >
+              <Lock className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hidden sm:inline">Staff Access</span>
+              <span className="sm:hidden">Staff</span>
+            </Link>
+
             <span className="text-xs text-slate-300 hidden md:inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-full border border-white/10">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span>National Blood Supply Grid Connected</span>

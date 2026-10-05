@@ -12,6 +12,7 @@ import { Donate } from './pages/donor/Donate';
 import { BloodBankList } from './pages/bloodbank/BloodBankList';
 import { BloodBankDetails } from './pages/bloodbank/BloodBankDetails';
 import { BloodBankAuth } from './pages/bloodbank/BloodBankAuth';
+import { BloodBankStaffLogin } from './pages/bloodbank/BloodBankStaffLogin';
 import { BloodBankDashboard } from './pages/bloodbank/BloodBankDashboard';
 import { BloodBankInventory } from './pages/bloodbank/BloodBankInventory';
 import { BloodBankDonations } from './pages/bloodbank/BloodBankDonations';
@@ -144,6 +145,8 @@ export function App() {
 
         {/* BLOOD BANK PORTAL FLOW */}
         <Route path="/blood-banks" element={<BloodBankList />} />
+        {/* Staff Login must be before /:bloodBankId to avoid route conflict */}
+        <Route path="/blood-bank/staff-login" element={<BloodBankStaffLogin />} />
         <Route path="/blood-bank/:bloodBankId" element={<BloodBankDetails />} />
         <Route path="/blood-bank/:bloodBankId/auth" element={<BloodBankAuth />} />
         <Route path="/blood-bank/:bloodBankId/dashboard" element={<BloodBankDashboard />} />

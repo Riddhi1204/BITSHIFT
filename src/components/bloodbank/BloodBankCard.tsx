@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Droplet, MapPin, Phone, ShieldCheck, Clock, ArrowRight, Activity, Lock } from 'lucide-react';
+import { Droplet, MapPin, Phone, ShieldCheck, Clock, ArrowRight, Activity } from 'lucide-react';
 import type { BloodBank } from '../../types';
 import { BloodAvailabilityBadge } from './BloodAvailabilityBadge';
 
@@ -12,11 +12,6 @@ export const BloodBankCard = ({ bloodBank }: BloodBankCardProps) => {
 
   const handleCardClick = () => {
     navigate(`/blood-bank/${bloodBank.id}`);
-  };
-
-  const handleAdminAuthClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigate(`/blood-bank/${bloodBank.id}/auth`);
   };
 
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
@@ -140,26 +135,15 @@ export const BloodBankCard = ({ bloodBank }: BloodBankCardProps) => {
 
       </div>
 
-      {/* FOOTER ACTION BUTTONS */}
-      <div className="pt-4 mt-5 border-t border-slate-100 flex items-center justify-between gap-3">
-        
-        <button
-          onClick={handleCardClick}
-          className="text-xs font-bold text-slate-600 hover:text-brand-red transition-colors flex items-center gap-1"
-        >
-          <span>View Full Inventory</span>
-          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-        </button>
+      {/* FOOTER ACTION */}
+      <div className="pt-4 mt-5 border-t border-slate-100 flex items-center justify-between">
+        <span className="text-xs font-bold text-slate-700 group-hover:text-brand-red transition-colors">
+          View Full Inventory
+        </span>
 
-        <button
-          onClick={handleAdminAuthClick}
-          className="px-4 py-2 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-glow-red flex items-center gap-1.5 transition-all group/btn"
-        >
-          <Lock className="w-3 h-3" />
-          <span>Administrator Login</span>
-          <ArrowRight className="w-3 h-3 group-hover/btn:translate-x-0.5 transition-transform" />
-        </button>
-
+        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 group-hover:bg-brand-red group-hover:text-white flex items-center justify-center group-hover:translate-x-1.5 transition-all duration-300">
+          <ArrowRight className="w-4 h-4" />
+        </div>
       </div>
 
     </div>
