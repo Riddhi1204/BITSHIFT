@@ -15,12 +15,17 @@ import {
   FileCheck,
   HelpCircle
 } from 'lucide-react';
+import { useEffect } from 'react';
 import { GovernmentLayout } from '../../components/government/GovernmentLayout';
-import { MOCK_HOSPITAL_APPLICATIONS } from '../../data/mockData';
 import type { HospitalApplication } from '../../types';
+import {
+  getHospitalApplications,
+  approveHospitalApplication,
+  rejectHospitalApplication
+} from '../../utils/hospitalVerificationStore';
 
 export const GovernmentHospitals = () => {
-  const [hospitals, setHospitals] = useState<HospitalApplication[]>(MOCK_HOSPITAL_APPLICATIONS);
+  const [hospitals, setHospitals] = useState<HospitalApplication[]>(getHospitalApplications);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Verified' | 'Under Review' | 'Rejected'>('All');
   const [stateFilter, setStateFilter] = useState('All');
@@ -38,21 +43,35 @@ export const GovernmentHospitals = () => {
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    setHospitals(getHospitalApplications());
+
+    const handleAppsUpdated = () => {
+      setHospitals(getHospitalApplications());
+    };
+
+    window.addEventListener('hemovite_applications_updated', handleAppsUpdated);
+    return () => {
+      window.removeEventListener('hemovite_applications_updated', handleAppsUpdated);
+    };
+  }, []);
+
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
   };
 
   const states = useMemo(() => {
-    const list = Array.from(new Set(MOCK_HOSPITAL_APPLICATIONS.map((h) => h.state)));
+    const list = Array.from(new Set(hospitals.map((h) => h.state)));
     return ['All', ...list.sort()];
-  }, []);
+  }, [hospitals]);
 
   const filteredHospitals = useMemo(() => {
     return hospitals.filter((h) => {
       const matchSearch =
         h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         h.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (h.licenseNumber && h.licenseNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
         h.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
         h.state.toLowerCase().includes(searchQuery.toLowerCase()) ||
         h.bloodBankLinked.toLowerCase().includes(searchQuery.toLowerCase());
@@ -65,53 +84,18 @@ export const GovernmentHospitals = () => {
   }, [hospitals, searchQuery, statusFilter, stateFilter]);
 
   const handleApprove = (hosp: HospitalApplication) => {
-    setHospitals((prev) =>
-      prev.map((h) =>
-        h.id === hosp.id
-          ? {
-              ...h,
-              status: 'Verified',
-              auditLog: [
-                ...h.auditLog,
-                {
-                  action: 'Approved & Verified',
-                  by: 'Dr. Rajeshwar Sharma (NBTC / DGHS)',
-                  date: new Date().toISOString().slice(0, 16).replace('T', ' '),
-                  note: 'Clinical establishment license & storage validated.',
-                },
-              ],
-            }
-          : h
-      )
-    );
+    approveHospitalApplication(hosp.id, 'Dr. Rajeshwar Sharma (NBTC / DGHS)');
+    setHospitals(getHospitalApplications());
     setReviewingHosp(null);
-    triggerToast(`Hospital ${hosp.name} (${hosp.id}) approved and verified successfully!`);
+    triggerToast(`Hospital ${hosp.name} (${hosp.id}) approved & added to active Registered Hospitals!`);
   };
 
   const handleConfirmReject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!rejectingHosp || !rejectReason.trim()) return;
 
-    setHospitals((prev) =>
-      prev.map((h) =>
-        h.id === rejectingHosp.id
-          ? {
-              ...h,
-              status: 'Rejected',
-              rejectionReason: rejectReason,
-              auditLog: [
-                ...h.auditLog,
-                {
-                  action: 'Application Rejected',
-                  by: 'Dr. Rajeshwar Sharma (NBTC)',
-                  date: new Date().toISOString().slice(0, 16).replace('T', ' '),
-                  note: rejectReason,
-                },
-              ],
-            }
-          : h
-      )
-    );
+    rejectHospitalApplication(rejectingHosp.id, rejectReason, 'Dr. Rajeshwar Sharma (NBTC)');
+    setHospitals(getHospitalApplications());
 
     triggerToast(`Application for ${rejectingHosp.name} has been rejected.`);
     setRejectingHosp(null);

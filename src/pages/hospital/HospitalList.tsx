@@ -1,31 +1,55 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, ArrowLeft, ShieldCheck, Search, Sparkles, PlusCircle, Lock } from 'lucide-react';
-import { REGISTERED_HOSPITALS } from '../../data/mockData';
+import { Building2, ArrowLeft, ShieldCheck, Search, Sparkles, PlusCircle, Lock, CheckCircle2 } from 'lucide-react';
 import { HospitalCard } from '../../components/hospital/HospitalCard';
 import { HospitalSearch } from '../../components/hospital/HospitalSearch';
+import { HospitalVerificationModal } from '../../components/modals/HospitalVerificationModal';
+import { getRegisteredHospitals } from '../../utils/hospitalVerificationStore';
+import type { Hospital } from '../../types';
 
 export const HospitalList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [hospitals, setHospitals] = useState<Hospital[]>(getRegisteredHospitals);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('All');
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   useEffect(() => {
+    // Sync with registered hospitals store
+    setHospitals(getRegisteredHospitals());
+
+    const handleHospitalsUpdated = () => {
+      setHospitals(getRegisteredHospitals());
+    };
+
+    window.addEventListener('hemovite_hospitals_updated', handleHospitalsUpdated);
+
     // Smooth initial loading skeleton simulation
     const timer = setTimeout(() => {
       setLoading(false);
     }, 350);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('hemovite_hospitals_updated', handleHospitalsUpdated);
+    };
   }, []);
+
+  const triggerSuccessToast = (hospitalName: string) => {
+    setSuccessToast(`Verification application for "${hospitalName}" submitted successfully. Pending Government authority review.`);
+    setTimeout(() => {
+      setSuccessToast(null);
+    }, 5000);
+  };
 
   const availableCities = useMemo(() => {
-    const cities = Array.from(new Set(REGISTERED_HOSPITALS.map((h) => h.city)));
+    const cities = Array.from(new Set(hospitals.map((h) => h.city)));
     return cities.sort();
-  }, []);
+  }, [hospitals]);
 
   const filteredHospitals = useMemo(() => {
-    return REGISTERED_HOSPITALS.filter((h) => {
+    return hospitals.filter((h) => {
       const matchesSearch =
         h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         h.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -36,7 +60,7 @@ export const HospitalList = () => {
 
       return matchesSearch && matchesCity;
     });
-  }, [searchQuery, selectedCity]);
+  }, [hospitals, searchQuery, selectedCity]);
 
   const handleSelectHospital = (hospitalId: string) => {
     navigate(`/hospital/${hospitalId}`);
@@ -201,15 +225,30 @@ export const HospitalList = () => {
             </p>
           </div>
 
-          <Link
-            to="/#contact"
-            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs whitespace-nowrap transition-all"
+          <button
+            onClick={() => setVerificationModalOpen(true)}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 border border-brand-red/40 text-white font-bold text-xs whitespace-nowrap transition-all shadow-md shadow-brand-red/30 cursor-pointer"
           >
             Apply for Verification
-          </Link>
+          </button>
         </div>
 
       </main>
+
+      {/* TOAST ALERT */}
+      {successToast && (
+        <div className="fixed bottom-6 right-6 z-50 px-5 py-3.5 bg-emerald-600 text-white rounded-2xl shadow-2xl flex items-center gap-3 text-xs sm:text-sm font-bold animate-in slide-in-from-bottom duration-200 border border-emerald-400/50">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <span>{successToast}</span>
+        </div>
+      )}
+
+      {/* HOSPITAL VERIFICATION MODAL */}
+      <HospitalVerificationModal
+        isOpen={verificationModalOpen}
+        onClose={() => setVerificationModalOpen(false)}
+        onSuccess={triggerSuccessToast}
+      />
 
       {/* FOOTER */}
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">

@@ -27,10 +27,16 @@ import {
   MOCK_BLOOD_HOTSPOTS,
   MOCK_HOSPITAL_APPLICATIONS
 } from '../../data/mockData';
+import { useEffect } from 'react';
 import type { HospitalApplication, BloodHotspot } from '../../types';
+import {
+  getHospitalApplications,
+  approveHospitalApplication,
+  rejectHospitalApplication
+} from '../../utils/hospitalVerificationStore';
 
 export const GovernmentDashboard = () => {
-  const [hospitals, setHospitals] = useState<HospitalApplication[]>(MOCK_HOSPITAL_APPLICATIONS);
+  const [hospitals, setHospitals] = useState<HospitalApplication[]>(getHospitalApplications);
   const [stats, setStats] = useState(MOCK_GOV_STATS);
   const [selectedHotspot, setSelectedHotspot] = useState<BloodHotspot>(MOCK_BLOOD_HOTSPOTS[0]);
   const [reviewingHosp, setReviewingHosp] = useState<HospitalApplication | null>(null);
@@ -40,64 +46,55 @@ export const GovernmentDashboard = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    // Initial fetch from store
+    const apps = getHospitalApplications();
+    setHospitals(apps);
+
+    const handleAppsUpdated = () => {
+      const updated = getHospitalApplications();
+      setHospitals(updated);
+      const pendingCount = updated.filter((h) => h.status === 'Pending').length;
+      const verifiedCount = updated.filter((h) => h.status === 'Verified').length;
+      setStats((prev) => ({
+        ...prev,
+        pendingVerification: pendingCount,
+        verifiedHospitals: 116 + verifiedCount,
+        registeredHospitals: 128 + updated.length - MOCK_HOSPITAL_APPLICATIONS.length,
+      }));
+    };
+
+    window.addEventListener('hemovite_applications_updated', handleAppsUpdated);
+    return () => {
+      window.removeEventListener('hemovite_applications_updated', handleAppsUpdated);
+    };
+  }, []);
+
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
   };
 
   const handleVerify = (id: string, name: string) => {
-    setHospitals((prev) =>
-      prev.map((h) =>
-        h.id === id
-          ? {
-              ...h,
-              status: 'Verified' as const,
-              auditLog: [
-                ...h.auditLog,
-                {
-                  action: 'Verified by Health Authority',
-                  by: 'Dr. Rajeshwar Sharma (DGHS)',
-                  date: new Date().toISOString().slice(0, 16).replace('T', ' '),
-                  note: 'Institutional compliance verified against NDHM criteria.',
-                },
-              ],
-            }
-          : h
-      )
-    );
+    approveHospitalApplication(id, 'Dr. Rajeshwar Sharma (NBTC / DGHS)');
+    const updated = getHospitalApplications();
+    setHospitals(updated);
     setStats((prev) => ({
       ...prev,
       pendingVerification: Math.max(0, prev.pendingVerification - 1),
       verifiedHospitals: prev.verifiedHospitals + 1,
     }));
     setReviewingHosp(null);
-    triggerToast(`Hospital ${name} (${id}) has been officially verified!`);
+    triggerToast(`Hospital ${name} (${id}) has been officially verified and added to the National Health Grid!`);
   };
 
   const handleConfirmReject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!rejectModalHosp || !rejectReason.trim()) return;
 
-    setHospitals((prev) =>
-      prev.map((h) =>
-        h.id === rejectModalHosp.id
-          ? {
-              ...h,
-              status: 'Rejected' as const,
-              rejectionReason: rejectReason,
-              auditLog: [
-                ...h.auditLog,
-                {
-                  action: 'Application Rejected',
-                  by: 'Dr. Rajeshwar Sharma (NBTC)',
-                  date: new Date().toISOString().slice(0, 16).replace('T', ' '),
-                  note: rejectReason,
-                },
-              ],
-            }
-          : h
-      )
-    );
+    rejectHospitalApplication(rejectModalHosp.id, rejectReason, 'Dr. Rajeshwar Sharma (NBTC)');
+    const updated = getHospitalApplications();
+    setHospitals(updated);
 
     triggerToast(`Application for ${rejectModalHosp.name} has been rejected.`);
     setRejectModalHosp(null);
@@ -322,7 +319,7 @@ export const GovernmentDashboard = () => {
               to="/government/hospitals"
               className="text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1 hover:underline self-start sm:self-auto"
             >
-              <span>View All Applications ({hospitals.length})</span>
+              <span>View All Verification Requests ({hospitals.length})</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -331,46 +328,56 @@ export const GovernmentDashboard = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-4">Hospital Name & ID</th>
+                  <th className="py-3 px-4">Hospital Name & License No.</th>
                   <th className="py-3 px-4">Location</th>
-                  <th className="py-3 px-4">Contact</th>
-                  <th className="py-3 px-4">Beds</th>
-                  <th className="py-3 px-4">Linked Blood Bank</th>
+                  <th className="py-3 px-4">Submission Date</th>
+                  <th className="py-3 px-4">Beds & Linked Hub</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                {hospitals.slice(0, 5).map((hosp) => (
+                {hospitals.slice(0, 6).map((hosp) => (
                   <tr key={hosp.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-900">
                       <div>{hosp.name}</div>
-                      <span className="text-[11px] font-mono text-slate-400">{hosp.id}</span>
+                      <span className="text-[11px] font-mono text-slate-500 font-normal">
+                        {hosp.licenseNumber || hosp.id}
+                      </span>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-700">{hosp.city}, {hosp.state}</td>
-                    <td className="py-3.5 px-4 font-mono text-slate-600">{hosp.contact}</td>
-                    <td className="py-3.5 px-4 font-mono text-slate-800">{hosp.bedCapacity} Beds</td>
-                    <td className="py-3.5 px-4 font-medium text-slate-800">{hosp.bloodBankLinked}</td>
+                    <td className="py-3.5 px-4 text-slate-700">
+                      <div>{hosp.city}, {hosp.state}</div>
+                      <span className="text-[11px] text-slate-400 truncate block max-w-xs">{hosp.address}</span>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-slate-700">
+                      {hosp.applicationDate}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-700">
+                      <span className="font-mono font-bold text-slate-800">{hosp.bedCapacity} Beds</span>
+                      <span className="text-[11px] text-slate-500 block truncate max-w-[160px]">{hosp.bloodBankLinked}</span>
+                    </td>
                     <td className="py-3.5 px-4">
                       <span
-                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1 ${
                           hosp.status === 'Verified'
-                            ? 'bg-emerald-100 text-emerald-800'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                             : hosp.status === 'Pending'
-                            ? 'bg-amber-100 text-amber-800 animate-pulse'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-200 animate-pulse'
                             : hosp.status === 'Rejected'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-blue-100 text-blue-800'
+                            ? 'bg-red-100 text-red-800 border border-red-200'
+                            : 'bg-blue-100 text-blue-800 border border-blue-200'
                         }`}
                       >
-                        {hosp.status}
+                        {hosp.status === 'Verified' && <ShieldCheck className="w-3 h-3 text-emerald-600" />}
+                        <span>{hosp.status === 'Verified' ? 'Verified Node' : hosp.status}</span>
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={() => setReviewingHosp(hosp)}
                           className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Inspect application documents"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Review</span>
@@ -380,8 +387,22 @@ export const GovernmentDashboard = () => {
                           <button
                             onClick={() => handleVerify(hosp.id, hosp.name)}
                             className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer"
+                            title="Approve and activate as verified node"
                           >
-                            Verify
+                            Approve
+                          </button>
+                        )}
+
+                        {hosp.status === 'Pending' && (
+                          <button
+                            onClick={() => {
+                              setRejectModalHosp(hosp);
+                              setRejectReason('Deficiencies in uploaded accreditation or licensing documentation.');
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-xs transition-colors cursor-pointer"
+                            title="Reject application"
+                          >
+                            Reject
                           </button>
                         )}
                       </div>

@@ -217,6 +217,8 @@ export interface HospitalApplication {
   auditLog: { action: string; by: string; date: string; note?: string }[];
   stock?: Record<string, number>;
   requirements?: Record<string, { required: number; available: number; urgency: string }>;
+  licenseNumber?: string;
+  contactPerson?: string;
 }
 
 export interface BloodHotspot {

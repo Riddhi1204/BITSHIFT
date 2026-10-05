@@ -18,13 +18,15 @@ import {
   ExternalLink,
   Lock
 } from 'lucide-react';
-import { REGISTERED_HOSPITALS, REGISTERED_BLOOD_BANKS } from '../../data/mockData';
+import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
+import { getRegisteredHospitals } from '../../utils/hospitalVerificationStore';
 
 export const HospitalDetails = () => {
   const { hospitalId } = useParams<{ hospitalId: string }>();
   const navigate = useNavigate();
 
-  const hospital = REGISTERED_HOSPITALS.find((h) => h.id === hospitalId);
+  const hospitals = getRegisteredHospitals();
+  const hospital = hospitals.find((h) => h.id === hospitalId);
 
   // 21. ERROR HANDLING (404 Not Found)
   if (!hospital) {
