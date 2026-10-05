@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { 
   Droplet, 
@@ -16,37 +16,82 @@ import {
   ArrowRight,
   Sparkles,
   Info,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
-import { REGISTERED_HOSPITALS } from '../../data/mockData';
+import { hospitalApi } from '../../services/hospitalApi';
+import { donationApi } from '../../services/donationApi';
+import type { Hospital } from '../../types';
 
 export const Donate = () => {
   const [searchParams] = useSearchParams();
 
-  // Selected hospital from query parameter, or fallback to first hospital
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [, setLoadingHospitals] = useState(true);
+
+  // Selected hospital from query parameter, or fallback
   const hospitalIdParam = searchParams.get('hospitalId');
   const [selectedHospitalId, setSelectedHospitalId] = useState<string>(
     hospitalIdParam || 'HOS-001'
   );
 
+  useEffect(() => {
+    let isMounted = true;
+    hospitalApi.getAll()
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (Array.isArray(res) && res.length > 0) {
+          setHospitals(res);
+          if (!hospitalIdParam) {
+            setSelectedHospitalId(res[0].id);
+          }
+        }
+      })
+      .catch((err) => console.error('Failed to load hospitals for donate page:', err))
+      .finally(() => {
+        if (isMounted) setLoadingHospitals(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hospitalIdParam]);
+
   const hospital = useMemo(() => {
     return (
-      REGISTERED_HOSPITALS.find((h) => h.id === selectedHospitalId) ||
-      REGISTERED_HOSPITALS[0]
+      hospitals.find((h) => h.id === selectedHospitalId) ||
+      hospitals[0] || {
+        id: 'HOS-001',
+        name: 'City Hospital',
+        city: 'Ranchi',
+        state: 'Jharkhand',
+        address: 'Main Road',
+        phone: '+91 98765 43210',
+        emergencyContact: '+91 98765 43211',
+        verified: true,
+        stock: { 'O-': 1, 'O+': 18, 'A+': 10, 'A-': 2, 'B+': 15, 'B-': 2, 'AB+': 8, 'AB-': 1 },
+        bloodRequirements: {
+          'O-': { required: 6, available: 1, urgency: 'critical', patients: 2, requiredWithin: '1.5 Hours' },
+          'B-': { required: 5, available: 2, urgency: 'emergency', patients: 2, requiredWithin: '2 Hours' },
+          'A-': { required: 4, available: 2, urgency: 'emergency', patients: 1, requiredWithin: '3 Hours' },
+          'AB-': { required: 3, available: 1, urgency: 'critical', patients: 1, requiredWithin: '2 Hours' },
+        }
+      }
     );
-  }, [selectedHospitalId]);
+  }, [hospitals, selectedHospitalId]);
 
   // Form State
   const [fullName, setFullName] = useState('');
   const [selectedBloodGroup, setSelectedBloodGroup] = useState<string>('O-');
   const [age, setAge] = useState<string>('28');
   const [phone, setPhone] = useState('');
-  const [city, setCity] = useState(hospital.city);
+  const [city, setCity] = useState(hospital.city || 'Ranchi');
   const [lastDonation, setLastDonation] = useState('');
   const [isFirstTime, setIsFirstTime] = useState(false);
   const [availability, setAvailability] = useState<'now' | 'emergency' | 'not_available'>('now');
   const [contactMethod, setContactMethod] = useState<'phone' | 'whatsapp' | 'sms'>('phone');
   const [confirmed, setConfirmed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [volunteerRefId, setVolunteerRefId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -56,16 +101,16 @@ export const Donate = () => {
   // Hospital Emergency Requirements
   const emergencyReqs = useMemo(() => {
     if (!hospital.bloodRequirements) return [];
-    return Object.entries(hospital.bloodRequirements).filter(([_, data]) => {
-      const shortage = Math.max(0, data.required - data.available);
+    return Object.entries(hospital.bloodRequirements).filter(([_, data]: [string, any]) => {
+      const shortage = Math.max(0, (data.required || 0) - (data.available || 0));
       return data.urgency === 'emergency' || data.urgency === 'critical' || shortage > 0;
     });
   }, [hospital]);
 
   // Matching check for selected blood group
-  const groupRequirement = hospital.bloodRequirements?.[selectedBloodGroup];
+  const groupRequirement = (hospital.bloodRequirements as any)?.[selectedBloodGroup];
   const groupShortage = groupRequirement
-    ? Math.max(0, groupRequirement.required - groupRequirement.available)
+    ? Math.max(0, (groupRequirement.required || 0) - (groupRequirement.available || 0))
     : 0;
   
   const isEmergencyMatch = 
@@ -76,15 +121,15 @@ export const Donate = () => {
 
   // Other hospitals needing this blood group
   const otherHospitalsNeeding = useMemo(() => {
-    if (!selectedBloodGroup) return [];
-    return REGISTERED_HOSPITALS.filter((h) => {
+    if (!selectedBloodGroup || hospitals.length === 0) return [];
+    return hospitals.filter((h) => {
       if (h.id === hospital.id) return false;
-      const req = h.bloodRequirements?.[selectedBloodGroup];
+      const req = (h.bloodRequirements as any)?.[selectedBloodGroup];
       return req && (req.urgency === 'critical' || req.urgency === 'emergency' || req.required > req.available);
     }).slice(0, 3);
-  }, [selectedBloodGroup, hospital.id]);
+  }, [selectedBloodGroup, hospital.id, hospitals]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -101,13 +146,31 @@ export const Donate = () => {
       return;
     }
 
-    // Generate reference ID and switch to success view
-    const refCode = `VOL-${selectedBloodGroup.replace('+', 'P').replace('-', 'N')}-${Math.floor(
-      1000 + Math.random() * 9000
-    )}`;
-    setVolunteerRefId(refCode);
-    setIsSubmitted(true);
-    window.scrollTo({ top: 100, behavior: 'smooth' });
+    setIsSubmitting(true);
+
+    try {
+      // Record in PostgreSQL donation ledger
+      await donationApi.create({
+        hospitalId: hospital.id,
+        donorName: fullName,
+        bloodGroup: selectedBloodGroup,
+        units: 1,
+        donationDate: new Date().toISOString(),
+        status: 'scheduled',
+        notes: `Volunteer response for ${hospital.name}. Availability: ${availability}. Phone: ${phone}`
+      });
+
+      const refCode = `VOL-${selectedBloodGroup.replace('+', 'P').replace('-', 'N')}-${Math.floor(
+        1000 + Math.random() * 9000
+      )}`;
+      setVolunteerRefId(refCode);
+      setIsSubmitted(true);
+      window.scrollTo({ top: 100, behavior: 'smooth' });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error recording donation response');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -157,13 +220,11 @@ export const Donate = () => {
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
-            Your donation can help fulfill an urgent blood requirement.
+            Your donation connects directly to PostgreSQL verified hospital supply records.
           </p>
         </div>
 
-        {/* ========================================================================= */}
         {/* SUCCESS CONFIRMATION STATE */}
-        {/* ========================================================================= */}
         {isSubmitted ? (
           <div className="bg-white rounded-3xl border border-emerald-200 p-8 sm:p-10 shadow-card-elevated text-center space-y-6 animate-fadeIn relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
@@ -182,7 +243,7 @@ export const Donate = () => {
               </h2>
 
               <p className="text-sm text-slate-600">
-                Your donation offer has been registered for clinical emergency dispatch.
+                Your donation offer has been registered in the PostgreSQL central database for clinical dispatch.
               </p>
             </div>
 
@@ -225,7 +286,7 @@ export const Donate = () => {
             <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4 max-w-md mx-auto text-xs text-blue-900 flex items-start gap-3 text-left">
               <Lock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <p className="leading-relaxed">
-                Your contact information may be shared with the authorized hospital/blood bank only for this blood request.
+                Your contact information may be shared with authorized hospital/blood bank personnel only for this blood request.
               </p>
             </div>
 
@@ -233,7 +294,7 @@ export const Donate = () => {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2 max-w-md mx-auto">
               <Link
                 to={`/hospital/${hospital.id}`}
-                className="w-full sm:w-1/2 py-3 px-4 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+                className="w-full sm:w-1/2 py-3 px-4 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>View Emergency Requests</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -246,16 +307,14 @@ export const Donate = () => {
                   setPhone('');
                   setConfirmed(false);
                 }}
-                className="w-full sm:w-1/2 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
+                className="w-full sm:w-1/2 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
               >
                 Register Another Donor
               </button>
             </div>
           </div>
         ) : (
-          /* ========================================================================= */
           /* DONOR REGISTRATION FORM & MATCHING VIEW */
-          /* ========================================================================= */
           <div className="space-y-6">
             
             {/* 1. TARGET HOSPITAL CONTEXT CARD */}
@@ -292,12 +351,12 @@ export const Donate = () => {
                     value={selectedHospitalId}
                     onChange={(e) => {
                       setSelectedHospitalId(e.target.value);
-                      const target = REGISTERED_HOSPITALS.find((h) => h.id === e.target.value);
+                      const target = hospitals.find((h) => h.id === e.target.value);
                       if (target) setCity(target.city);
                     }}
-                    className="bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-red w-full sm:w-auto"
+                    className="bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-red w-full sm:w-auto cursor-pointer"
                   >
-                    {REGISTERED_HOSPITALS.map((h) => (
+                    {hospitals.map((h) => (
                       <option key={h.id} value={h.id} className="bg-slate-900 text-white">
                         {h.name} ({h.city})
                       </option>
@@ -314,14 +373,14 @@ export const Donate = () => {
                 </span>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  {emergencyReqs.map(([group, data]) => {
-                    const shortage = Math.max(0, data.required - data.available);
+                  {emergencyReqs.map(([group, data]: [string, any]) => {
+                    const shortage = Math.max(0, (data.required || 0) - (data.available || 0));
                     return (
                       <button
                         key={group}
                         type="button"
                         onClick={() => setSelectedBloodGroup(group)}
-                        className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
+                        className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all cursor-pointer ${
                           selectedBloodGroup === group
                             ? 'bg-brand-red text-white border-brand-red ring-2 ring-red-400'
                             : 'bg-white/10 text-slate-200 border-white/15 hover:bg-white/20'
@@ -351,7 +410,7 @@ export const Donate = () => {
               {/* 8 Blood Group Selector Buttons */}
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-2.5">
                 {bloodGroups.map((grp) => {
-                  const isMatch = emergencyReqs.some(([g]) => g === grp);
+                  const isMatch = emergencyReqs.some(([g]: [string, any]) => g === grp);
                   const isSelected = selectedBloodGroup === grp;
 
                   return (
@@ -359,7 +418,7 @@ export const Donate = () => {
                       key={grp}
                       type="button"
                       onClick={() => setSelectedBloodGroup(grp)}
-                      className={`p-3 rounded-2xl border text-center transition-all duration-200 relative ${
+                      className={`p-3 rounded-2xl border text-center transition-all duration-200 relative cursor-pointer ${
                         isSelected
                           ? 'bg-gradient-to-br from-brand-red to-brand-deep text-white border-brand-red shadow-md scale-105'
                           : 'bg-slate-50 hover:bg-red-50/50 text-slate-900 border-slate-200 hover:border-red-200'
@@ -379,7 +438,6 @@ export const Donate = () => {
 
               {/* MATCHING FEEDBACK BOX */}
               {isEmergencyMatch ? (
-                /* MATCH FOUND ALERT */
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-5 space-y-3 text-xs animate-fadeIn">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2 text-red-900 font-bold text-sm">
@@ -387,7 +445,7 @@ export const Donate = () => {
                       <span>Critical Need Match: {selectedBloodGroup} Blood is urgently needed!</span>
                     </div>
                     <span className="px-2.5 py-0.5 bg-red-600 text-white rounded-full font-black text-[10px] uppercase animate-pulse">
-                      {groupRequirement?.urgency.toUpperCase()}
+                      {groupRequirement?.urgency?.toUpperCase()}
                     </span>
                   </div>
 
@@ -422,7 +480,6 @@ export const Donate = () => {
                   </div>
                 </div>
               ) : (
-                /* NO CURRENT EMERGENCY REQUIREMENT */
                 <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-5 space-y-3 text-xs animate-fadeIn">
                   <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
                     <Info className="w-4 h-4 text-amber-600 shrink-0" />
@@ -447,7 +504,7 @@ export const Donate = () => {
                               setSelectedHospitalId(h.id);
                               setCity(h.city);
                             }}
-                            className="bg-white hover:bg-red-50 text-slate-800 hover:text-brand-red border border-amber-200 px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1 shadow-sm"
+                            className="bg-white hover:bg-red-50 text-slate-800 hover:text-brand-red border border-amber-200 px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1 shadow-sm cursor-pointer"
                           >
                             <span>{h.name}</span>
                             <ArrowRight className="w-3 h-3 text-brand-red" />
@@ -458,7 +515,7 @@ export const Donate = () => {
                   )}
 
                   <p className="text-[11px] text-slate-600 pt-1">
-                    You can still register below to be added to HemoVite's voluntary backup donor registry.
+                    You can still register below to be added to HemoVite's voluntary backup donor registry in PostgreSQL.
                   </p>
                 </div>
               )}
@@ -472,7 +529,7 @@ export const Donate = () => {
                   <span>2. Complete Your Donor Volunteer Registration</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  All personal data is encrypted and shared only with verified hospital blood coordinators.
+                  All personal data is encrypted and saved directly to the database for hospital coordinators.
                 </p>
               </div>
 
@@ -563,7 +620,7 @@ export const Donate = () => {
                         type="checkbox"
                         checked={isFirstTime}
                         onChange={(e) => setIsFirstTime(e.target.checked)}
-                        className="rounded border-slate-300 text-brand-red focus:ring-brand-red"
+                        className="rounded border-slate-300 text-brand-red focus:ring-brand-red cursor-pointer"
                       />
                       <span>First-time donor (Never donated before)</span>
                     </label>
@@ -591,7 +648,7 @@ export const Donate = () => {
                     <button
                       type="button"
                       onClick={() => setAvailability('now')}
-                      className={`p-3 rounded-2xl border text-left transition-all ${
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                         availability === 'now'
                           ? 'bg-emerald-50 border-emerald-400 text-emerald-900 ring-1 ring-emerald-400'
                           : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -604,7 +661,7 @@ export const Donate = () => {
                     <button
                       type="button"
                       onClick={() => setAvailability('emergency')}
-                      className={`p-3 rounded-2xl border text-left transition-all ${
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                         availability === 'emergency'
                           ? 'bg-amber-50 border-amber-400 text-amber-900 ring-1 ring-amber-400'
                           : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -617,7 +674,7 @@ export const Donate = () => {
                     <button
                       type="button"
                       onClick={() => setAvailability('not_available')}
-                      className={`p-3 rounded-2xl border text-left transition-all ${
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                         availability === 'not_available'
                           ? 'bg-red-50 border-red-300 text-red-900 ring-1 ring-red-300'
                           : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -691,15 +748,25 @@ export const Donate = () => {
               <div className="pt-3">
                 <button
                   type="submit"
-                  className="w-full py-4 px-6 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-black text-sm sm:text-base rounded-2xl shadow-lg hover:shadow-glow-red hover:-translate-y-0.5 flex items-center justify-center gap-2 transition-all cursor-pointer group"
+                  disabled={isSubmitting}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 disabled:opacity-50 text-white font-black text-sm sm:text-base rounded-2xl shadow-lg hover:shadow-glow-red hover:-translate-y-0.5 flex items-center justify-center gap-2 transition-all cursor-pointer group"
                 >
-                  <Droplet className="w-5 h-5 fill-current text-white group-hover:scale-110 transition-transform" />
-                  <span>
-                    {isEmergencyMatch
-                      ? `🩸 Respond to This Emergency at ${hospital.name}`
-                      : '🩸 Register as Blood Donor'}
-                  </span>
-                  <Send className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Saving to Central Registry...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Droplet className="w-5 h-5 fill-current text-white group-hover:scale-110 transition-transform" />
+                      <span>
+                        {isEmergencyMatch
+                          ? `🩸 Respond to This Emergency at ${hospital.name}`
+                          : '🩸 Register as Blood Donor'}
+                      </span>
+                      <Send className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </>
+                  )}
                 </button>
               </div>
 

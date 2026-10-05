@@ -4,57 +4,66 @@ import { Building2, ArrowLeft, ShieldCheck, Search, Sparkles, PlusCircle, Lock, 
 import { HospitalCard } from '../../components/hospital/HospitalCard';
 import { HospitalSearch } from '../../components/hospital/HospitalSearch';
 import { HospitalVerificationModal } from '../../components/modals/HospitalVerificationModal';
-import { getRegisteredHospitals } from '../../utils/hospitalVerificationStore';
+import { hospitalApi } from '../../services/hospitalApi';
 import type { Hospital } from '../../types';
 
 export const HospitalList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [hospitals, setHospitals] = useState<Hospital[]>(getRegisteredHospitals);
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('All');
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
+  const fetchHospitals = async () => {
+    try {
+      const res = await hospitalApi.getAll();
+      if (Array.isArray(res) && res.length > 0) {
+        setHospitals(res as any);
+      }
+    } catch (err) {
+      console.error('Failed to load hospitals from API:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Sync with registered hospitals store
-    setHospitals(getRegisteredHospitals());
+    fetchHospitals();
 
     const handleHospitalsUpdated = () => {
-      setHospitals(getRegisteredHospitals());
+      fetchHospitals();
     };
 
     window.addEventListener('hemovite_hospitals_updated', handleHospitalsUpdated);
-
-    // Smooth initial loading skeleton simulation
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 350);
     return () => {
-      clearTimeout(timer);
       window.removeEventListener('hemovite_hospitals_updated', handleHospitalsUpdated);
     };
   }, []);
 
   const triggerSuccessToast = (hospitalName: string) => {
-    setSuccessToast(`Verification application for "${hospitalName}" submitted successfully. Pending Government authority review.`);
+    setSuccessToast(`Verification application for "${hospitalName}" submitted successfully to PostgreSQL database. Pending Government authority review.`);
     setTimeout(() => {
       setSuccessToast(null);
     }, 5000);
+    fetchHospitals();
   };
 
   const availableCities = useMemo(() => {
-    const cities = Array.from(new Set(hospitals.map((h) => h.city)));
+    const cities = Array.from(new Set(hospitals.map((h) => h.city))).filter(Boolean);
     return cities.sort();
   }, [hospitals]);
 
   const filteredHospitals = useMemo(() => {
     return hospitals.filter((h) => {
+      const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
-        h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.state.toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        h.name.toLowerCase().includes(q) ||
+        h.id.toLowerCase().includes(q) ||
+        (h.city && h.city.toLowerCase().includes(q)) ||
+        (h.state && h.state.toLowerCase().includes(q));
 
       const matchesCity = selectedCity === 'All' || h.city === selectedCity;
 
@@ -136,7 +145,7 @@ export const HospitalList = () => {
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600">
-            Find and view clinical blood requirements, emergency shortages, and hospital details across the network.
+            Find and view clinical blood requirements, emergency shortages, and hospital details across the PostgreSQL database network.
           </p>
         </div>
 
@@ -205,7 +214,7 @@ export const HospitalList = () => {
                   setSearchQuery('');
                   setSelectedCity('All');
                 }}
-                className="px-5 py-2.5 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all"
+                className="px-5 py-2.5 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all cursor-pointer"
               >
                 Clear Search Filters
               </button>

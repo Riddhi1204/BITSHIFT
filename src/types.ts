@@ -301,4 +301,25 @@ export interface HospitalDonorPledge {
   notes?: string;
 }
 
+export interface GovStats {
+  registeredHospitals?: number;
+  totalHospitals?: number;
+  pendingVerification: number;
+  verifiedHospitals: number;
+  pendingHospitals?: number;
+  bloodBanks?: number;
+  totalBloodBanks?: number;
+  verifiedBloodBanks?: number;
+  activeRequests: number;
+  totalDonations?: number;
+  urgentRequests?: number;
+  totalUnitsAvailable?: number;
+  unitsAvailable?: number;
+  unitsDonated?: number;
+  activeHotspots?: number;
+  criticalShortages?: number;
+  criticalShortageAreas?: number;
+  nationalCoverage?: number;
+}
+
 

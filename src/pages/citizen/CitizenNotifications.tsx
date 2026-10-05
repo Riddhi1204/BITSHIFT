@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Bell, AlertCircle, Droplet, Trophy, Building2, CheckCircle2 } from 'lucide-react';
 
 export const CitizenNotifications = () => {
-  const notifications = [
+  const [notifications, setNotifications] = useState<any[]>([
     {
       id: 'n1',
       type: 'emergency',
@@ -46,7 +47,11 @@ export const CitizenNotifications = () => {
       color: 'text-blue-400',
       bg: 'bg-blue-500/10'
     }
-  ];
+  ]);
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-300">
@@ -56,7 +61,10 @@ export const CitizenNotifications = () => {
           <Bell className="w-5 h-5 text-slate-400" />
           Notification Center
         </h2>
-        <button className="text-xs font-bold text-slate-400 hover:text-white transition-colors flex items-center gap-1.5">
+        <button 
+          onClick={markAllAsRead}
+          className="text-xs font-bold text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+        >
           <CheckCircle2 className="w-4 h-4" />
           Mark all as read
         </button>
@@ -64,7 +72,7 @@ export const CitizenNotifications = () => {
 
       <div className="space-y-3">
         {notifications.map(notif => {
-          const Icon = notif.icon;
+          const Icon = notif.icon || AlertCircle;
           return (
             <div 
               key={notif.id} 
@@ -93,9 +101,9 @@ export const CitizenNotifications = () => {
                 
                 {notif.type === 'emergency' && (
                   <div className="mt-3">
-                    <button className="px-4 py-2 bg-brand-red hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors">
+                    <a href="/citizen/find-blood" className="px-4 py-2 bg-brand-red hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors inline-block">
                       View Request Details
-                    </button>
+                    </a>
                   </div>
                 )}
               </div>

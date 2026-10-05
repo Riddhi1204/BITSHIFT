@@ -1,7 +1,35 @@
+import { useState, useEffect } from 'react';
 import { Award, Lock, Trophy, Heart, Shield, Star } from 'lucide-react';
+import { citizenApi } from '../../services/citizenApi';
 
 export const CitizenBadges = () => {
-  let donationsCount = 6;
+  const [donationsCount, setDonationsCount] = useState(6);
+  const [, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+
+    citizenApi.getDashboard()
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (res?.stats?.donated !== undefined) {
+          setDonationsCount(res.stats.donated);
+        } else if (res?.totalDonations !== undefined) {
+          setDonationsCount(res.totalDonations);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load citizen badge telemetry:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const badges = [
     {
@@ -9,7 +37,7 @@ export const CitizenBadges = () => {
       name: 'First Drop',
       description: 'Completed 1 donation',
       required: 1,
-      icon: DropletIcon,
+      icon: Heart,
       color: 'text-red-400',
       bg: 'bg-red-500/10',
       border: 'border-red-500/20'
@@ -20,7 +48,7 @@ export const CitizenBadges = () => {
       description: 'Completed 5 donations',
       required: 5,
       icon: Star,
-      color: 'text-amber-600', // bronze color
+      color: 'text-amber-600',
       bg: 'bg-amber-900/20',
       border: 'border-amber-700/30'
     },
@@ -56,10 +84,6 @@ export const CitizenBadges = () => {
     }
   ];
 
-  function DropletIcon(props: any) {
-    return <Heart {...props} />;
-  }
-
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
@@ -70,7 +94,7 @@ export const CitizenBadges = () => {
           </div>
           <h2 className="text-2xl font-black text-white">Your Achievements</h2>
           <p className="text-sm text-slate-400 mt-2">
-            Earn badges by consistently donating blood. You currently have {donationsCount} donations.
+            Earn badges by consistently donating blood. You currently have {donationsCount} verified donation(s) in PostgreSQL records.
           </p>
         </div>
 
@@ -79,7 +103,6 @@ export const CitizenBadges = () => {
             const isUnlocked = donationsCount >= badge.required;
             const Icon = badge.icon;
             
-            // Calculate progress for next badge
             let progress = 100;
             if (!isUnlocked) {
               progress = (donationsCount / badge.required) * 100;
@@ -127,13 +150,6 @@ export const CitizenBadges = () => {
             );
           })}
         </div>
-        
-        {donationsCount === 0 && (
-          <div className="mt-8 bg-brand-red/10 border border-brand-red/20 rounded-2xl p-6 text-center max-w-md mx-auto">
-            <h4 className="text-sm font-bold text-white mb-2">Your first badge is waiting.</h4>
-            <p className="text-xs text-red-200">Complete your first eligible donation to begin your journey and unlock the First Drop badge.</p>
-          </div>
-        )}
       </div>
 
     </div>

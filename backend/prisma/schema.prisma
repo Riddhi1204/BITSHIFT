@@ -1,0 +1,509 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Region {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String               @db.VarChar(150)
+  type                String               @db.VarChar(20)
+  parentId            String?              @map("parent_id") @db.Uuid
+  latitude            Decimal?             @db.Decimal(10, 7)
+  longitude           Decimal?             @db.Decimal(10, 7)
+  isActive            Boolean?             @default(true) @map("is_active")
+  createdAt           DateTime?            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime?            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bloodBanks          BloodBank[]
+  bloodRequests       BloodRequest[]
+  donationCampaigns   DonationCampaign[]
+  governmentProfiles  GovernmentProfile[]
+  hospitals           Hospital[]
+  parent              Region?              @relation("RegionHierarchy", fields: [parentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  children            Region[]             @relation("RegionHierarchy")
+  shortagePredictions ShortagePrediction[]
+  users               User[]
+
+  @@index([parentId], map: "idx_regions_parent")
+  @@index([type], map: "idx_regions_type")
+  @@map("regions")
+}
+
+model User {
+  id                     String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullName               String                        @map("full_name") @db.VarChar(150)
+  email                  String                        @unique @db.VarChar(255)
+  passwordHash           String                        @map("password_hash")
+  phone                  String?                       @db.VarChar(20)
+  role                   String                        @default("citizen") @db.VarChar(30)
+  avatarUrl              String?                       @map("avatar_url")
+  bloodGroup             String?                       @map("blood_group") @db.VarChar(5)
+  dateOfBirth            DateTime?                     @map("date_of_birth") @db.Date
+  gender                 String?                       @db.VarChar(30)
+  regionId               String?                       @map("region_id") @db.Uuid
+  city                   String?                       @db.VarChar(100)
+  state                  String?                       @db.VarChar(100)
+  latitude               Decimal?                      @db.Decimal(10, 7)
+  longitude              Decimal?                      @db.Decimal(10, 7)
+  isVerified             Boolean?                      @default(false) @map("is_verified")
+  isActive               Boolean?                      @default(true) @map("is_active")
+  lastLoginAt            DateTime?                     @map("last_login_at") @db.Timestamptz(6)
+  createdAt              DateTime?                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime?                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  auditLogs              AuditLog[]
+  verifiedBloodBanks     BloodBank[]                   @relation("VerifiedBloodBanks")
+  bloodRequests          BloodRequest[]                @relation("UserBloodRequests")
+  citizenBadges          CitizenBadge[]
+  citizenProfile         CitizenProfile?
+  organizedCampaigns     DonationCampaign[]            @relation("OrganizedCampaigns")
+  donations              Donation[]                    @relation("UserDonations")
+  donorMatches           DonorMatch[]                  @relation("UserDonorMatches")
+  governmentProfile      GovernmentProfile?
+  hospitalStaff          HospitalStaff?
+  reviewedVerifications  HospitalVerificationRequest[] @relation("ReviewedVerifications")
+  submittedVerifications HospitalVerificationRequest[] @relation("SubmittedVerifications")
+  verifiedHospitals      Hospital[]                    @relation("VerifiedHospitals")
+  donatedBatches         InventoryBatch[]              @relation("DonorBatches")
+  approvedTransfers      InventoryTransfer[]           @relation("ApprovedTransfers")
+  requestedTransfers     InventoryTransfer[]           @relation("RequestedTransfers")
+  notifications          Notification[]
+  region                 Region?                       @relation(fields: [regionId], references: [id], onUpdate: NoAction)
+
+  @@index([email], map: "idx_users_email")
+  @@index([role], map: "idx_users_role")
+  @@index([bloodGroup], map: "idx_users_blood_group")
+  @@map("users")
+}
+
+model CitizenProfile {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String    @unique @map("user_id") @db.Uuid
+  emergencyContactName  String?   @map("emergency_contact_name") @db.VarChar(150)
+  emergencyContactPhone String?   @map("emergency_contact_phone") @db.VarChar(20)
+  address               String?
+  occupation            String?   @db.VarChar(150)
+  totalDonations        Int?      @default(0) @map("total_donations")
+  lastDonationDate      DateTime? @map("last_donation_date") @db.Date
+  donorAvailable        Boolean?  @default(false) @map("donor_available")
+  emergencyAvailable    Boolean?  @default(false) @map("emergency_available")
+  donationEligible      Boolean?  @default(true) @map("donation_eligible")
+  healthNotes           String?   @map("health_notes")
+  createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("citizen_profiles")
+}
+
+model GovernmentProfile {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  department         String?   @db.VarChar(200)
+  designation        String?   @db.VarChar(150)
+  employeeId         String?   @unique @map("employee_id") @db.VarChar(100)
+  authorityLevel     String?   @map("authority_level") @db.VarChar(50)
+  regionId           String?   @map("region_id") @db.Uuid
+  verificationStatus String?   @default("pending") @map("verification_status") @db.VarChar(30)
+  createdAt          DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  region             Region?   @relation(fields: [regionId], references: [id], onUpdate: NoAction)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("government_profiles")
+}
+
+model Hospital {
+  id                     String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String                        @db.VarChar(200)
+  registrationNumber     String?                       @unique @map("registration_number") @db.VarChar(100)
+  address                String
+  city                   String?                       @db.VarChar(100)
+  state                  String?                       @db.VarChar(100)
+  regionId               String?                       @map("region_id") @db.Uuid
+  phone                  String?                       @db.VarChar(20)
+  emergencyPhone         String?                       @map("emergency_phone") @db.VarChar(20)
+  email                  String?                       @db.VarChar(255)
+  latitude               Decimal?                      @db.Decimal(10, 7)
+  longitude              Decimal?                      @db.Decimal(10, 7)
+  emergencyAvailable     Boolean?                      @default(true) @map("emergency_available")
+  bloodServiceAvailable  Boolean?                      @default(true) @map("blood_service_available")
+  verificationStatus     String?                       @default("pending") @map("verification_status") @db.VarChar(30)
+  verifiedBy             String?                       @map("verified_by") @db.Uuid
+  verifiedAt             DateTime?                     @map("verified_at") @db.Timestamptz(6)
+  websiteUrl             String?                       @map("website_url")
+  isActive               Boolean?                      @default(true) @map("is_active")
+  createdAt              DateTime?                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime?                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  inventories            BloodInventory[]
+  bloodRequests          BloodRequest[]
+  donationCampaigns      DonationCampaign[]
+  donations              Donation[]
+  staff                  HospitalStaff[]
+  verificationRequests   HospitalVerificationRequest[]
+  region                 Region?                       @relation(fields: [regionId], references: [id], onUpdate: NoAction)
+  verifier               User?                         @relation("VerifiedHospitals", fields: [verifiedBy], references: [id], onUpdate: NoAction)
+  transfersAsDestination InventoryTransfer[]           @relation("DestinationHospitalTransfers")
+  transfersAsSource      InventoryTransfer[]           @relation("SourceHospitalTransfers")
+  shortagePredictions    ShortagePrediction[]
+
+  @@index([regionId], map: "idx_hospitals_region")
+  @@index([city], map: "idx_hospitals_city")
+  @@index([verificationStatus], map: "idx_hospitals_status")
+  @@map("hospitals")
+}
+
+model HospitalStaff {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalId  String    @map("hospital_id") @db.Uuid
+  userId      String    @unique @map("user_id") @db.Uuid
+  designation String?   @db.VarChar(150)
+  department  String?   @db.VarChar(150)
+  employeeId  String?   @map("employee_id") @db.VarChar(100)
+  isVerified  Boolean?  @default(false) @map("is_verified")
+  isActive    Boolean?  @default(true) @map("is_active")
+  joinedAt    DateTime? @default(now()) @map("joined_at") @db.Timestamptz(6)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  hospital    Hospital  @relation(fields: [hospitalId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([hospitalId], map: "idx_hospital_staff_hospital")
+  @@map("hospital_staff")
+}
+
+model BloodBank {
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String               @db.VarChar(200)
+  registrationNumber     String?              @unique @map("registration_number") @db.VarChar(100)
+  address                String
+  city                   String?              @db.VarChar(100)
+  state                  String?              @db.VarChar(100)
+  regionId               String?              @map("region_id") @db.Uuid
+  phone                  String?              @db.VarChar(20)
+  email                  String?              @db.VarChar(255)
+  latitude               Decimal?             @db.Decimal(10, 7)
+  longitude              Decimal?             @db.Decimal(10, 7)
+  operatingHours         String?              @map("operating_hours")
+  verificationStatus     String?              @default("pending") @map("verification_status") @db.VarChar(30)
+  verifiedBy             String?              @map("verified_by") @db.Uuid
+  verifiedAt             DateTime?            @map("verified_at") @db.Timestamptz(6)
+  websiteUrl             String?              @map("website_url")
+  isActive               Boolean?             @default(true) @map("is_active")
+  createdAt              DateTime?            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime?            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  region                 Region?              @relation(fields: [regionId], references: [id], onUpdate: NoAction)
+  verifier               User?                @relation("VerifiedBloodBanks", fields: [verifiedBy], references: [id], onUpdate: NoAction)
+  inventories            BloodInventory[]
+  donationCampaigns      DonationCampaign[]
+  donations              Donation[]
+  transfersAsDestination InventoryTransfer[]  @relation("DestinationBloodBankTransfers")
+  transfersAsSource      InventoryTransfer[]  @relation("SourceBloodBankTransfers")
+  shortagePredictions    ShortagePrediction[]
+
+  @@map("blood_banks")
+}
+
+model BloodInventory {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalId           String?          @map("hospital_id") @db.Uuid
+  bloodBankId          String?          @map("blood_bank_id") @db.Uuid
+  bloodGroup           String           @map("blood_group") @db.VarChar(5)
+  component            String?          @default("whole_blood") @db.VarChar(50)
+  unitsAvailable       Int?             @default(0) @map("units_available")
+  reservedUnits        Int?             @default(0) @map("reserved_units")
+  minimumRequiredUnits Int?             @default(0) @map("minimum_required_units")
+  lastUpdated          DateTime?        @default(now()) @map("last_updated") @db.Timestamptz(6)
+  createdAt            DateTime?        @default(now()) @map("created_at") @db.Timestamptz(6)
+  bloodBank            BloodBank?       @relation(fields: [bloodBankId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  hospital             Hospital?        @relation(fields: [hospitalId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  batches              InventoryBatch[]
+
+  @@index([bloodGroup], map: "idx_inventory_group")
+  @@index([hospitalId], map: "idx_inventory_hospital")
+  @@index([bloodBankId], map: "idx_inventory_bank")
+  @@map("blood_inventory")
+}
+
+model InventoryBatch {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inventoryId    String              @map("inventory_id") @db.Uuid
+  batchNumber    String              @unique @map("batch_number") @db.VarChar(100)
+  bloodGroup     String              @map("blood_group") @db.VarChar(5)
+  component      String              @db.VarChar(50)
+  units          Int
+  collectionDate DateTime?           @map("collection_date") @db.Date
+  expiryDate     DateTime            @map("expiry_date") @db.Date
+  status         String?             @default("available") @db.VarChar(30)
+  donorId        String?             @map("donor_id") @db.Uuid
+  createdAt      DateTime?           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime?           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  donor          User?               @relation("DonorBatches", fields: [donorId], references: [id], onUpdate: NoAction)
+  inventory      BloodInventory      @relation(fields: [inventoryId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  transfers      InventoryTransfer[]
+
+  @@index([expiryDate], map: "idx_batches_expiry")
+  @@index([status], map: "idx_batches_status")
+  @@map("inventory_batches")
+}
+
+model BloodRequest {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestCode     String         @unique @default(dbgenerated("('BG-'::text || upper(SUBSTRING(replace((gen_random_uuid())::text, '-'::text, ''::text) FROM 1 FOR 8)))")) @map("request_code") @db.VarChar(30)
+  requesterId     String         @map("requester_id") @db.Uuid
+  hospitalId      String?        @map("hospital_id") @db.Uuid
+  patientName     String?        @map("patient_name") @db.VarChar(150)
+  patientAge      Int?           @map("patient_age")
+  patientGender   String?        @map("patient_gender") @db.VarChar(30)
+  bloodGroup      String         @map("blood_group") @db.VarChar(5)
+  component       String?        @default("whole_blood") @db.VarChar(50)
+  unitsRequired   Int            @map("units_required")
+  unitsFulfilled  Int?           @default(0) @map("units_fulfilled")
+  hospitalName    String?        @map("hospital_name") @db.VarChar(200)
+  hospitalAddress String?        @map("hospital_address")
+  city            String?        @db.VarChar(100)
+  state           String?        @db.VarChar(100)
+  regionId        String?        @map("region_id") @db.Uuid
+  latitude        Decimal?       @db.Decimal(10, 7)
+  longitude       Decimal?       @db.Decimal(10, 7)
+  urgency         String?        @default("normal") @db.VarChar(20)
+  status          String?        @default("active") @db.VarChar(30)
+  requiredBy      DateTime?      @map("required_by") @db.Timestamptz(6)
+  contactPhone    String?        @map("contact_phone") @db.VarChar(20)
+  notes           String?
+  createdAt       DateTime?      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime?      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  hospital        Hospital?      @relation(fields: [hospitalId], references: [id], onUpdate: NoAction)
+  region          Region?        @relation(fields: [regionId], references: [id], onUpdate: NoAction)
+  requester       User           @relation("UserBloodRequests", fields: [requesterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  donorMatches    DonorMatch[]
+  notifications   Notification[]
+
+  @@index([bloodGroup], map: "idx_requests_blood_group")
+  @@index([status], map: "idx_requests_status")
+  @@index([urgency], map: "idx_requests_urgency")
+  @@index([regionId], map: "idx_requests_region")
+  @@map("blood_requests")
+}
+
+model Donation {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  donorId        String     @map("donor_id") @db.Uuid
+  hospitalId     String?    @map("hospital_id") @db.Uuid
+  bloodBankId    String?    @map("blood_bank_id") @db.Uuid
+  bloodGroup     String     @map("blood_group") @db.VarChar(5)
+  component      String?    @default("whole_blood") @db.VarChar(50)
+  units          Int?       @default(1)
+  donationDate   DateTime?  @default(now()) @map("donation_date") @db.Timestamptz(6)
+  status         String?    @default("completed") @db.VarChar(30)
+  certificateUrl String?    @map("certificate_url")
+  notes          String?
+  createdAt      DateTime?  @default(now()) @map("created_at") @db.Timestamptz(6)
+  bloodBank      BloodBank? @relation(fields: [bloodBankId], references: [id], onUpdate: NoAction)
+  donor          User       @relation("UserDonations", fields: [donorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  hospital       Hospital?  @relation(fields: [hospitalId], references: [id], onUpdate: NoAction)
+
+  @@index([donorId], map: "idx_donations_donor")
+  @@index([donationDate], map: "idx_donations_date")
+  @@map("donations")
+}
+
+model DonorMatch {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId         String         @map("request_id") @db.Uuid
+  donorId           String         @map("donor_id") @db.Uuid
+  matchScore        Decimal?       @map("match_score") @db.Decimal(5, 2)
+  distanceKm        Decimal?       @map("distance_km") @db.Decimal(10, 2)
+  bloodGroupMatch   Boolean?       @default(false) @map("blood_group_match")
+  availabilityMatch Boolean?       @default(false) @map("availability_match")
+  locationMatch     Boolean?       @default(false) @map("location_match")
+  eligibilityMatch  Boolean?       @default(false) @map("eligibility_match")
+  aiReason          String?        @map("ai_reason")
+  status            String?        @default("suggested") @db.VarChar(30)
+  createdAt         DateTime?      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime?      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  donor             User           @relation("UserDonorMatches", fields: [donorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  request           BloodRequest   @relation(fields: [requestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  notifications     Notification[]
+
+  @@unique([requestId, donorId])
+  @@index([requestId], map: "idx_matches_request")
+  @@index([donorId], map: "idx_matches_donor")
+  @@index([matchScore(sort: Desc)], map: "idx_matches_score")
+  @@map("donor_matches")
+}
+
+model Badge {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String         @unique @db.VarChar(100)
+  description      String?
+  iconUrl          String?        @map("icon_url")
+  requirementType  String?        @map("requirement_type") @db.VarChar(50)
+  requirementValue Int?           @map("requirement_value")
+  points           Int?           @default(0)
+  isActive         Boolean?       @default(true) @map("is_active")
+  createdAt        DateTime?      @default(now()) @map("created_at") @db.Timestamptz(6)
+  citizenBadges    CitizenBadge[]
+
+  @@map("badges")
+}
+
+model CitizenBadge {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  citizenId String    @map("citizen_id") @db.Uuid
+  badgeId   String    @map("badge_id") @db.Uuid
+  earnedAt  DateTime? @default(now()) @map("earned_at") @db.Timestamptz(6)
+  badge     Badge     @relation(fields: [badgeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  citizen   User      @relation(fields: [citizenId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([citizenId, badgeId])
+  @@map("citizen_badges")
+}
+
+model Notification {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String        @map("user_id") @db.Uuid
+  title            String        @db.VarChar(200)
+  message          String
+  type             String?       @default("general") @db.VarChar(50)
+  relatedRequestId String?       @map("related_request_id") @db.Uuid
+  relatedMatchId   String?       @map("related_match_id") @db.Uuid
+  isRead           Boolean?      @default(false) @map("is_read")
+  priority         String?       @default("normal") @db.VarChar(20)
+  createdAt        DateTime?     @default(now()) @map("created_at") @db.Timestamptz(6)
+  donorMatch       DonorMatch?   @relation(fields: [relatedMatchId], references: [id], onUpdate: NoAction)
+  bloodRequest     BloodRequest? @relation(fields: [relatedRequestId], references: [id], onUpdate: NoAction)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId], map: "idx_notifications_user")
+  @@index([userId, isRead], map: "idx_notifications_unread")
+  @@map("notifications")
+}
+
+model HospitalVerificationRequest {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalId              String    @map("hospital_id") @db.Uuid
+  submittedBy             String    @map("submitted_by") @db.Uuid
+  reviewedBy              String?   @map("reviewed_by") @db.Uuid
+  registrationDocumentUrl String?   @map("registration_document_url")
+  licenseDocumentUrl      String?   @map("license_document_url")
+  additionalDocuments     Json?     @map("additional_documents")
+  status                  String?   @default("pending") @db.VarChar(30)
+  reviewNotes             String?   @map("review_notes")
+  submittedAt             DateTime? @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt              DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  hospital                Hospital  @relation(fields: [hospitalId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reviewer                User?     @relation("ReviewedVerifications", fields: [reviewedBy], references: [id], onUpdate: NoAction)
+  submitter               User      @relation("SubmittedVerifications", fields: [submittedBy], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([status], map: "idx_hospital_verification_status")
+  @@map("hospital_verification_requests")
+}
+
+model InventoryTransfer {
+  id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceHospitalId       String?         @map("source_hospital_id") @db.Uuid
+  sourceBloodBankId      String?         @map("source_blood_bank_id") @db.Uuid
+  destinationHospitalId  String?         @map("destination_hospital_id") @db.Uuid
+  destinationBloodBankId String?         @map("destination_blood_bank_id") @db.Uuid
+  bloodGroup             String          @map("blood_group") @db.VarChar(5)
+  component              String?         @default("whole_blood") @db.VarChar(50)
+  units                  Int
+  batchId                String?         @map("batch_id") @db.Uuid
+  requestedBy            String?         @map("requested_by") @db.Uuid
+  approvedBy             String?         @map("approved_by") @db.Uuid
+  status                 String?         @default("requested") @db.VarChar(30)
+  requestedAt            DateTime?       @default(now()) @map("requested_at") @db.Timestamptz(6)
+  completedAt            DateTime?       @map("completed_at") @db.Timestamptz(6)
+  notes                  String?
+  approver               User?           @relation("ApprovedTransfers", fields: [approvedBy], references: [id], onUpdate: NoAction)
+  batch                  InventoryBatch? @relation(fields: [batchId], references: [id], onUpdate: NoAction)
+  destinationBloodBank   BloodBank?      @relation("DestinationBloodBankTransfers", fields: [destinationBloodBankId], references: [id], onUpdate: NoAction)
+  destinationHospital    Hospital?       @relation("DestinationHospitalTransfers", fields: [destinationHospitalId], references: [id], onUpdate: NoAction)
+  requester              User?           @relation("RequestedTransfers", fields: [requestedBy], references: [id], onUpdate: NoAction)
+  sourceBloodBank        BloodBank?      @relation("SourceBloodBankTransfers", fields: [sourceBloodBankId], references: [id], onUpdate: NoAction)
+  sourceHospital         Hospital?       @relation("SourceHospitalTransfers", fields: [sourceHospitalId], references: [id], onUpdate: NoAction)
+
+  @@index([status], map: "idx_transfers_status")
+  @@map("inventory_transfers")
+}
+
+model ShortagePrediction {
+  id                     String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  regionId               String?    @map("region_id") @db.Uuid
+  hospitalId             String?    @map("hospital_id") @db.Uuid
+  bloodBankId            String?    @map("blood_bank_id") @db.Uuid
+  bloodGroup             String     @map("blood_group") @db.VarChar(5)
+  component              String?    @default("whole_blood") @db.VarChar(50)
+  predictedShortageUnits Int?       @default(0) @map("predicted_shortage_units")
+  predictedDemandUnits   Int?       @default(0) @map("predicted_demand_units")
+  currentAvailableUnits  Int?       @default(0) @map("current_available_units")
+  riskScore              Decimal?   @map("risk_score") @db.Decimal(5, 2)
+  riskLevel              String?    @map("risk_level") @db.VarChar(20)
+  predictionDate         DateTime?  @default(now()) @map("prediction_date") @db.Timestamptz(6)
+  predictedForDate       DateTime?  @map("predicted_for_date") @db.Date
+  modelName              String?    @map("model_name") @db.VarChar(100)
+  modelVersion           String?    @map("model_version") @db.VarChar(50)
+  confidenceScore        Decimal?   @map("confidence_score") @db.Decimal(5, 2)
+  explanation            String?
+  createdAt              DateTime?  @default(now()) @map("created_at") @db.Timestamptz(6)
+  bloodBank              BloodBank? @relation(fields: [bloodBankId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  hospital               Hospital?  @relation(fields: [hospitalId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  region                 Region?    @relation(fields: [regionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([regionId], map: "idx_shortage_region")
+  @@index([bloodGroup], map: "idx_shortage_group")
+  @@index([riskLevel], map: "idx_shortage_risk")
+  @@map("shortage_predictions")
+}
+
+model DonationCampaign {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String     @db.VarChar(200)
+  description     String?
+  organizerId     String     @map("organizer_id") @db.Uuid
+  hospitalId      String?    @map("hospital_id") @db.Uuid
+  bloodBankId     String?    @map("blood_bank_id") @db.Uuid
+  regionId        String?    @map("region_id") @db.Uuid
+  venue           String?    @db.VarChar(300)
+  address         String?
+  latitude        Decimal?   @db.Decimal(10, 7)
+  longitude       Decimal?   @db.Decimal(10, 7)
+  startTime       DateTime   @map("start_time") @db.Timestamptz(6)
+  endTime         DateTime?  @map("end_time") @db.Timestamptz(6)
+  targetDonations Int?       @default(0) @map("target_donations")
+  totalDonations  Int?       @default(0) @map("total_donations")
+  bannerUrl       String?    @map("banner_url")
+  status          String?    @default("upcoming") @db.VarChar(30)
+  createdAt       DateTime?  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime?  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bloodBank       BloodBank? @relation(fields: [bloodBankId], references: [id], onUpdate: NoAction)
+  hospital        Hospital?  @relation(fields: [hospitalId], references: [id], onUpdate: NoAction)
+  organizer       User       @relation("OrganizedCampaigns", fields: [organizerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  region          Region?    @relation(fields: [regionId], references: [id], onUpdate: NoAction)
+
+  @@index([regionId], map: "idx_campaign_region")
+  @@index([status], map: "idx_campaign_status")
+  @@map("donation_campaigns")
+}
+
+model AuditLog {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  action     String    @db.VarChar(100)
+  entityType String?   @map("entity_type") @db.VarChar(100)
+  entityId   String?   @map("entity_id") @db.Uuid
+  oldValues  Json?     @map("old_values")
+  newValues  Json?     @map("new_values")
+  ipAddress  String?   @map("ip_address") @db.Inet
+  userAgent  String?   @map("user_agent")
+  metadata   Json?
+  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  user       User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
+
+  @@index([userId], map: "idx_audit_user")
+  @@index([action], map: "idx_audit_action")
+  @@index([createdAt(sort: Desc)], map: "idx_audit_created")
+  @@map("audit_logs")
+}

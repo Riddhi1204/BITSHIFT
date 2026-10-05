@@ -1,37 +1,36 @@
-import { useState } from 'react';
-import { Search, MapPin, Phone, Droplet, Filter, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, MapPin, Phone, Droplet, ArrowRight, Loader2 } from 'lucide-react';
+import { citizenApi } from '../../services/citizenApi';
 
 export const CitizenFindBlood = () => {
   const [bloodGroup, setBloodGroup] = useState('O-');
   const [location, setLocation] = useState('Ranchi');
   const [isSearching, setIsSearching] = useState(false);
+  const [results, setResults] = useState<any[]>([]);
 
-  const mockResults = [
-    {
-      id: 1,
-      name: 'City Hospital',
-      distance: '2.1 km',
-      available: 4,
-      verified: true,
-      lastUpdated: '10 mins ago',
-      contact: '+91 98765 43210'
-    },
-    {
-      id: 2,
-      name: 'RIMS Blood Bank',
-      distance: '4.8 km',
-      available: 2,
-      verified: true,
-      lastUpdated: '1 hour ago',
-      contact: '+91 98765 43211'
+  const performSearch = async (group: string, city: string) => {
+    setIsSearching(true);
+    try {
+      const res = await citizenApi.searchNearby({ bloodGroup: group, city });
+      if (Array.isArray(res)) {
+        setResults(res);
+      } else {
+        setResults([]);
+      }
+    } catch (err) {
+      console.error('Failed to search nearby blood inventory:', err);
+    } finally {
+      setIsSearching(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    performSearch(bloodGroup, location);
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSearching(true);
-    // Simulate loading
-    setTimeout(() => setIsSearching(false), 800);
+    performSearch(bloodGroup, location);
   };
 
   return (
@@ -47,7 +46,7 @@ export const CitizenFindBlood = () => {
             <select
               value={bloodGroup}
               onChange={(e) => setBloodGroup(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-slate-900 border border-white/10 focus:border-brand-red/50 rounded-xl text-white font-bold appearance-none outline-none"
+              className="w-full pl-12 pr-4 py-4 bg-slate-900 border border-white/10 focus:border-brand-red/50 rounded-xl text-white font-bold appearance-none outline-none cursor-pointer"
             >
               <option value="A+">A+ Blood</option>
               <option value="A-">A- Blood</option>
@@ -75,7 +74,7 @@ export const CitizenFindBlood = () => {
 
           <button
             type="submit"
-            className="md:w-32 py-4 bg-brand-red hover:bg-red-600 text-white font-black rounded-xl shadow-lg shadow-brand-red/20 transition-all flex items-center justify-center gap-2"
+            className="md:w-32 py-4 bg-brand-red hover:bg-red-600 text-white font-black rounded-xl shadow-lg shadow-brand-red/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Search className="w-5 h-5" />
             <span>Search</span>
@@ -85,28 +84,27 @@ export const CitizenFindBlood = () => {
 
       {/* FILTERS */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-black text-white">Verified Resources</h2>
-        <button className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-white transition-colors bg-white/5 px-4 py-2 rounded-xl">
-          <Filter className="w-4 h-4" />
-          <span>Filters</span>
-        </button>
+        <h2 className="text-xl font-black text-white">Verified PostgreSQL Resources</h2>
+        <span className="text-xs font-mono font-bold text-slate-400 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+          Live Central Inventory Matrix
+        </span>
       </div>
 
       {/* RESULTS LIST */}
       <div className="space-y-4">
         {isSearching ? (
           <div className="text-center py-12">
-            <div className="w-12 h-12 border-4 border-brand-red border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-400">Searching live inventory...</p>
+            <Loader2 className="w-10 h-10 text-brand-red animate-spin mx-auto mb-4" />
+            <p className="text-slate-400">Searching PostgreSQL live inventory...</p>
           </div>
         ) : (
-          mockResults.map(result => (
-            <div key={result.id} className="bg-[#111827] border border-white/10 hover:border-white/20 transition-all rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg">
+          results.map((result, idx) => (
+            <div key={result.id || idx} className="bg-[#111827] border border-white/10 hover:border-white/20 transition-all rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg">
               
               <div className="flex-1 w-full flex flex-col sm:flex-row sm:items-center gap-5">
                 <div className="w-16 h-16 shrink-0 bg-brand-red/10 rounded-2xl flex items-center justify-center border border-brand-red/20">
                   <div className="text-center">
-                    <div className="text-xl font-black text-brand-red leading-none">{result.available}</div>
+                    <div className="text-xl font-black text-brand-red leading-none">{result.available || result.units || 0}</div>
                     <div className="text-[10px] font-bold text-red-300 uppercase mt-1">Units</div>
                   </div>
                 </div>
@@ -121,22 +119,32 @@ export const CitizenFindBlood = () => {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-slate-400">
-                    <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-500" /> {result.distance}</span>
+                    <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-500" /> {result.distance || result.city || 'Nearby'}</span>
                     <span className="w-1 h-1 bg-slate-700 rounded-full hidden sm:block"></span>
-                    <span>Updated {result.lastUpdated}</span>
+                    <span>Updated {result.lastUpdated || 'Live'}</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
-                <button className="flex-1 sm:flex-none px-6 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  <span>Contact</span>
-                </button>
-                <button className="flex-1 sm:flex-none px-6 py-3 bg-brand-red/10 hover:bg-brand-red hover:text-white text-brand-red font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 border border-brand-red/20">
-                  <span>View & Reserve</span>
+                {result.contact && (
+                  <a
+                    href={`tel:${result.contact}`}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    <Phone className="w-4 h-4 text-slate-400" />
+                    <span>Contact</span>
+                  </a>
+                )}
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(result.name || 'Hospital')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 sm:flex-none px-6 py-3 bg-brand-red/10 hover:bg-brand-red hover:text-white text-brand-red font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 border border-brand-red/20"
+                >
+                  <span>Directions & Info</span>
                   <ArrowRight className="w-4 h-4" />
-                </button>
+                </a>
               </div>
 
             </div>
@@ -144,18 +152,15 @@ export const CitizenFindBlood = () => {
         )}
         
         {/* EMPTY STATE */}
-        {!isSearching && mockResults.length === 0 && (
+        {!isSearching && results.length === 0 && (
           <div className="bg-[#111827] border border-white/10 rounded-3xl p-12 text-center">
             <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
               <Search className="w-6 h-6 text-slate-500" />
             </div>
             <h3 className="text-xl font-bold text-white mb-2">No blood available in this area</h3>
-            <p className="text-slate-400 max-w-md mx-auto">
-              We couldn't find verified {bloodGroup} blood within your current search radius. Consider creating an emergency request to notify donors directly.
+            <p className="text-slate-400 max-w-md mx-auto text-sm">
+              We couldn't find verified {bloodGroup} blood within your current search area. Consider creating an emergency request to notify donors directly.
             </p>
-            <button className="mt-6 px-6 py-3 bg-brand-red hover:bg-red-600 text-white font-bold rounded-xl transition-all">
-              Create Emergency Request
-            </button>
           </div>
         )}
       </div>

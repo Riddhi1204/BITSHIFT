@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   Droplet, 
@@ -9,19 +10,64 @@ import {
   ArrowLeft, 
   Lock, 
   Activity, 
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
-import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
 import { getBloodGroupStatus } from '../../components/bloodbank/BloodAvailabilityBadge';
+import { bloodBankApi } from '../../services/bloodBankApi';
+import type { BloodBank } from '../../types';
 
 export const BloodBankDetails = () => {
   const { bloodBankId } = useParams<{ bloodBankId: string }>();
   const navigate = useNavigate();
 
-  const bloodBank = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId);
+  const [bloodBank, setBloodBank] = useState<BloodBank | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // INVALID BLOOD BANK ERROR STATE (Requirement 25)
-  if (!bloodBank) {
+  useEffect(() => {
+    if (!bloodBankId) return;
+
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    bloodBankApi.getById(bloodBankId)
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (res && res.id) {
+          setBloodBank(res);
+        } else {
+          setError('Blood bank not found in database');
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err.message || 'Failed to connect to backend service');
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [bloodBankId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col items-center justify-center p-4">
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 max-w-md w-full text-center space-y-4 shadow-card-soft">
+          <Loader2 className="w-10 h-10 text-brand-red animate-spin mx-auto" />
+          <h2 className="text-xl font-bold text-slate-900">Loading Facility Dossier...</h2>
+          <p className="text-xs text-slate-500">Querying real-time blood bank storage records from PostgreSQL...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // INVALID BLOOD BANK ERROR STATE
+  if (error || !bloodBank) {
     return (
       <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
         <div className="bg-[#111827] border border-red-500/30 rounded-3xl p-8 sm:p-10 max-w-lg w-full text-center space-y-6 shadow-2xl">
@@ -34,15 +80,13 @@ export const BloodBankDetails = () => {
             <p className="text-sm text-slate-400">
               The blood bank identifier <strong className="text-red-400 font-mono">"{bloodBankId}"</strong> does not match any registered facility in the HemoVite network.
             </p>
-            <p className="text-xs text-slate-500">
-              Please return to the registered blood banks directory and select a valid facility.
-            </p>
+            {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
 
           <div className="pt-2">
             <Link
               to="/blood-banks"
-              className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all"
+              className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>View Registered Blood Banks</span>
@@ -54,6 +98,7 @@ export const BloodBankDetails = () => {
   }
 
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  const inventory = bloodBank.inventory || {};
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col selection:bg-brand-red selection:text-white">
@@ -80,7 +125,7 @@ export const BloodBankDetails = () => {
 
           <button
             onClick={() => navigate(`/blood-bank/${bloodBank.id}/auth`)}
-            className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-white/15 flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-white/15 flex items-center gap-1.5 transition-all cursor-pointer"
             title="Authorized staff portal"
           >
             <Lock className="w-3.5 h-3.5" />
@@ -157,7 +202,7 @@ export const BloodBankDetails = () => {
               <Phone className="w-4 h-4 text-brand-red shrink-0" />
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Phone Number</span>
-                <span className="font-mono font-bold text-white">{bloodBank.phone}</span>
+                <span className="font-mono font-bold text-white">{bloodBank.phone || 'N/A'}</span>
               </div>
             </div>
 
@@ -165,7 +210,7 @@ export const BloodBankDetails = () => {
               <Phone className="w-4 h-4 text-red-400 shrink-0" />
               <div>
                 <span className="text-red-400 block text-[10px] uppercase font-bold">Emergency 24/7 Hotline</span>
-                <span className="font-mono font-bold text-brand-bright">{bloodBank.emergencyContact}</span>
+                <span className="font-mono font-bold text-brand-bright">{bloodBank.emergencyContact || bloodBank.phone || 'N/A'}</span>
               </div>
             </div>
 
@@ -173,7 +218,7 @@ export const BloodBankDetails = () => {
               <Mail className="w-4 h-4 text-blue-400 shrink-0" />
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Official Email</span>
-                <span className="text-white truncate">{bloodBank.email}</span>
+                <span className="text-white truncate">{bloodBank.email || 'contact@bloodbank.org'}</span>
               </div>
             </div>
 
@@ -181,7 +226,7 @@ export const BloodBankDetails = () => {
               <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Operating Hours</span>
-                <span className="text-white font-semibold">{bloodBank.operatingHours}</span>
+                <span className="text-white font-semibold">{bloodBank.operatingHours || '24 Hours Open'}</span>
               </div>
             </div>
           </div>
@@ -194,7 +239,7 @@ export const BloodBankDetails = () => {
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-brand-red text-xs font-bold uppercase tracking-wider mb-1">
                 <Activity className="w-3.5 h-3.5" />
-                <span>Live Telemetry</span>
+                <span>Live PostgreSQL Telemetry</span>
               </div>
               <h2 className="text-2xl font-black text-slate-900">
                 Complete Blood Group Inventory
@@ -207,12 +252,12 @@ export const BloodBankDetails = () => {
             <div className="text-left sm:text-right">
               <span className="text-xs text-slate-400 font-medium">Total Available Reserve</span>
               <div className="text-3xl font-black text-slate-900 font-mono">
-                {bloodBank.totalUnits} <span className="text-xs font-normal text-slate-500">Units</span>
+                {bloodBank.totalUnits || Object.values(inventory).reduce((a, b) => a + b, 0)} <span className="text-xs font-normal text-slate-500">Units</span>
               </div>
             </div>
           </div>
 
-          {/* INVENTORY TABLE (Requirement 8) */}
+          {/* INVENTORY TABLE */}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -226,7 +271,7 @@ export const BloodBankDetails = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {bloodGroups.map((grp) => {
-                  const units = bloodBank.inventory[grp] ?? 0;
+                  const units = inventory[grp] ?? 0;
                   const meta = getBloodGroupStatus(units);
 
                   return (
@@ -277,7 +322,7 @@ export const BloodBankDetails = () => {
                       </td>
 
                       <td className="py-4 px-4 text-xs text-slate-500">
-                        {bloodBank.lastUpdated}
+                        {bloodBank.lastUpdated || 'Synchronized'}
                       </td>
                     </tr>
                   );

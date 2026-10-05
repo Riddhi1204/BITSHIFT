@@ -1,26 +1,73 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Droplet, Heart, Building2, AlertTriangle, AlertCircle, ArrowRight, MapPin } from 'lucide-react';
+import { citizenApi } from '../../services/citizenApi';
 
 export const CitizenDashboard = () => {
-  // Mock Data
-  const stats = {
+  const [stats, setStats] = useState({
     donated: 6,
     received: 2,
     hospitalsNearby: 12,
     activeRequests: 3
-  };
+  });
 
-  const donationProgress = {
+  const [donationProgress, setDonationProgress] = useState({
     total: 6,
     lastDonated: '12 Aug 2026',
     nextEligible: '12 Nov 2026',
     streak: 3
-  };
+  });
 
-  const nearbyHospitals = [
+  const [nearbyHospitals, setNearbyHospitals] = useState<any[]>([
     { id: 1, name: 'City Hospital', distance: '2.4 km', availableGroups: ['A+', 'B+', 'O+', 'O-'], status: 'Available', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
     { id: 2, name: 'RIMS Hospital', distance: '4.8 km', availableGroups: ['O-', 'B-'], status: 'Limited', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-  ];
+  ]);
+
+  const [, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+
+    citizenApi.getDashboard()
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (res) {
+          if (res.stats) {
+            setStats(res.stats);
+          } else if (res.totalDonations !== undefined) {
+            setStats((prev) => ({
+              ...prev,
+              donated: res.totalDonations,
+              activeRequests: res.bloodRequests?.length || prev.activeRequests,
+            }));
+          }
+          if (res.donationProgress) {
+            setDonationProgress(res.donationProgress);
+          } else if (res.eligibility) {
+            setDonationProgress((prev) => ({
+              ...prev,
+              total: res.totalDonations || prev.total,
+              lastDonated: res.eligibility.lastDonationDate || prev.lastDonated,
+              nextEligible: res.eligibility.nextEligibleDate || prev.nextEligible,
+            }));
+          }
+          if (res.nearbyHospitals && res.nearbyHospitals.length > 0) {
+            setNearbyHospitals(res.nearbyHospitals);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load citizen dashboard telemetry:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -34,7 +81,7 @@ export const CitizenDashboard = () => {
             <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-wide">I Need Blood Urgently</h2>
           </div>
           <p className="text-red-100 text-sm sm:text-base font-medium max-w-xl">
-            Create an emergency blood request and find verified nearby resources. Notifications will be sent to matched donors and hospitals immediately.
+            Create an emergency blood request and find verified nearby resources. Notifications will be sent to matched donors and hospitals immediately via PostgreSQL network grid.
           </p>
         </div>
         <Link 
@@ -157,22 +204,22 @@ export const CitizenDashboard = () => {
           </div>
 
           <div className="space-y-4 flex-1">
-            {nearbyHospitals.map(hospital => (
-              <div key={hospital.id} className="bg-white/5 border border-white/10 hover:border-white/20 transition-all rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {nearbyHospitals.map((hospital, idx) => (
+              <div key={hospital.id || idx} className="bg-white/5 border border-white/10 hover:border-white/20 transition-all rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="text-base font-bold text-white">{hospital.name}</h4>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${hospital.bg} ${hospital.color} ${hospital.border}`}>
-                      {hospital.status}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${hospital.bg || 'bg-emerald-500/10'} ${hospital.color || 'text-emerald-400'} ${hospital.border || 'border-emerald-500/20'}`}>
+                      {hospital.status || 'Available'}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400">
-                    <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {hospital.distance}</span>
+                    <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {hospital.distance || 'Near you'}</span>
                   </div>
                   
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     <span className="text-[10px] text-slate-500 uppercase font-bold mr-1 self-center">Available:</span>
-                    {hospital.availableGroups.map(bg => (
+                    {(hospital.availableGroups || ['A+', 'B+', 'O+', 'O-']).map((bg: string) => (
                       <span key={bg} className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] font-bold rounded border border-slate-700">
                         {bg}
                       </span>
@@ -181,12 +228,20 @@ export const CitizenDashboard = () => {
                 </div>
 
                 <div className="flex gap-2 sm:flex-col shrink-0">
-                  <button className="flex-1 sm:flex-none px-4 py-2 bg-white/10 hover:bg-white/15 text-white text-xs font-bold rounded-xl transition-colors text-center">
+                  <Link
+                    to={`/hospital/${hospital.id || 'HOS-001'}`}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-white/10 hover:bg-white/15 text-white text-xs font-bold rounded-xl transition-colors text-center"
+                  >
                     View Details
-                  </button>
-                  <button className="flex-1 sm:flex-none px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 text-xs font-bold rounded-xl transition-colors text-center flex items-center justify-center gap-1.5">
+                  </Link>
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(hospital.name || 'Hospital')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 sm:flex-none px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 text-xs font-bold rounded-xl transition-colors text-center flex items-center justify-center gap-1.5"
+                  >
                     <MapPin className="w-3.5 h-3.5" /> Directions
-                  </button>
+                  </a>
                 </div>
               </div>
             ))}

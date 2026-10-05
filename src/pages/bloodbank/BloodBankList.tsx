@@ -14,11 +14,14 @@ import {
   ArrowRight,
   Lock
 } from 'lucide-react';
-import { REGISTERED_BLOOD_BANKS, MOCK_NGO_PARTNERS } from '../../data/mockData';
+import { MOCK_NGO_PARTNERS } from '../../data/mockData';
 import { BloodBankCard } from '../../components/bloodbank/BloodBankCard';
 import { BloodBankSearch } from '../../components/bloodbank/BloodBankSearch';
+import { bloodBankApi } from '../../services/bloodBankApi';
+import type { BloodBank } from '../../types';
 
 export const BloodBankList = () => {
+  const [bloodBanks, setBloodBanks] = useState<BloodBank[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'verified' | 'operational' | 'low_stock' | 'ngo'>('all');
@@ -27,45 +30,61 @@ export const BloodBankList = () => {
   const [sortBy, setSortBy] = useState('highest_stock');
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 350);
-    return () => clearTimeout(timer);
+    let isMounted = true;
+    setLoading(true);
+
+    bloodBankApi.getAll()
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (Array.isArray(res) && res.length > 0) {
+          setBloodBanks(res);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load blood banks from API:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const availableCities = useMemo(() => {
-    return Array.from(new Set(REGISTERED_BLOOD_BANKS.map((b) => b.city))).sort();
-  }, []);
+    return Array.from(new Set(bloodBanks.map((b) => b.city))).filter(Boolean).sort();
+  }, [bloodBanks]);
 
   const availableStates = useMemo(() => {
-    return Array.from(new Set(REGISTERED_BLOOD_BANKS.map((b) => b.state))).sort();
-  }, []);
+    return Array.from(new Set(bloodBanks.map((b) => b.state))).filter(Boolean).sort();
+  }, [bloodBanks]);
 
   // Summary counts
   const stats = useMemo(() => {
-    const total = REGISTERED_BLOOD_BANKS.length;
-    const verified = REGISTERED_BLOOD_BANKS.filter((b) => b.verified).length;
-    const operational = REGISTERED_BLOOD_BANKS.filter((b) => b.status === 'operational').length;
-    const lowStock = REGISTERED_BLOOD_BANKS.filter((b) => {
-      // Check if any critical group has <= 5 units
+    const total = bloodBanks.length;
+    const verified = bloodBanks.filter((b) => b.verified).length;
+    const operational = bloodBanks.filter((b) => b.status === 'operational').length;
+    const lowStock = bloodBanks.filter((b) => {
+      if (!b.inventory) return false;
       return Object.values(b.inventory).some((u: number) => u <= 5);
     }).length;
-    const ngoCount = REGISTERED_BLOOD_BANKS.filter((b) => b.ngoPartner).length;
+    const ngoCount = bloodBanks.filter((b) => b.ngoPartner).length;
 
     return { total, verified, operational, lowStock, ngoCount };
-  }, []);
+  }, [bloodBanks]);
 
   // Filtered and sorted results
   const filteredBloodBanks = useMemo(() => {
-    let result = REGISTERED_BLOOD_BANKS.filter((bank) => {
+    let result = bloodBanks.filter((bank) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
         bank.name.toLowerCase().includes(q) ||
         bank.id.toLowerCase().includes(q) ||
-        bank.city.toLowerCase().includes(q) ||
-        bank.state.toLowerCase().includes(q) ||
-        bank.address.toLowerCase().includes(q) ||
+        (bank.city && bank.city.toLowerCase().includes(q)) ||
+        (bank.state && bank.state.toLowerCase().includes(q)) ||
+        (bank.address && bank.address.toLowerCase().includes(q)) ||
         (bank.initiative && bank.initiative.toLowerCase().includes(q)) ||
         (bank.organizationType && bank.organizationType.toLowerCase().includes(q));
 
@@ -79,7 +98,7 @@ export const BloodBankList = () => {
           : selectedFilter === 'operational'
           ? bank.status === 'operational'
           : selectedFilter === 'low_stock'
-          ? Object.values(bank.inventory).some((u: number) => u <= 5)
+          ? bank.inventory && Object.values(bank.inventory).some((u: number) => u <= 5)
           : true;
 
       const matchesCity = selectedCity === 'All' || bank.city === selectedCity;
@@ -92,17 +111,16 @@ export const BloodBankList = () => {
     result.sort((a, b) => {
       if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
       if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
-      if (sortBy === 'highest_stock') return b.totalUnits - a.totalUnits;
-      if (sortBy === 'lowest_stock') return a.totalUnits - b.totalUnits;
-      if (sortBy === 'recently_updated') return a.lastUpdated.localeCompare(b.lastUpdated);
+      if (sortBy === 'highest_stock') return (b.totalUnits || 0) - (a.totalUnits || 0);
+      if (sortBy === 'lowest_stock') return (a.totalUnits || 0) - (b.totalUnits || 0);
+      if (sortBy === 'recently_updated') return (a.lastUpdated || '').localeCompare(b.lastUpdated || '');
       return 0;
     });
 
     return result;
-  }, [searchQuery, selectedFilter, selectedCity, selectedState, sortBy]);
+  }, [bloodBanks, searchQuery, selectedFilter, selectedCity, selectedState, sortBy]);
 
   const handleNgoFilterSelect = (ngoName: string) => {
-    // Extract a search term from NGO name (e.g., "Red Cross", "Rotary", "Sankalp", "Think Foundation", "Lions", "Khoon")
     const simplified = ngoName.includes('Red Cross')
       ? 'Red Cross'
       : ngoName.includes('Rotary')
@@ -224,7 +242,7 @@ export const BloodBankList = () => {
                 </span>
               </h2>
               <p className="text-xs text-slate-500">
-                Live blood inventory ledgers and facility administration access points.
+                Live blood inventory ledgers and facility administration access points (PostgreSQL Database).
               </p>
             </div>
 
@@ -287,7 +305,7 @@ export const BloodBankList = () => {
                     setSelectedCity('All');
                     setSelectedState('All');
                   }}
-                  className="px-5 py-2.5 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all"
+                  className="px-5 py-2.5 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all cursor-pointer"
                 >
                   Reset Search Filters
                 </button>
@@ -318,7 +336,7 @@ export const BloodBankList = () => {
                 setSelectedFilter('ngo');
                 window.scrollTo({ top: 380, behavior: 'smooth' });
               }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-4 py-2.5 rounded-xl transition-all self-start md:self-auto"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-4 py-2.5 rounded-xl transition-all self-start md:self-auto cursor-pointer"
             >
               <span>View All NGO Blood Banks ({stats.ngoCount})</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -384,17 +402,17 @@ export const BloodBankList = () => {
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline"
                     >
-                      <Globe className="w-3 h-3" />
+                      <Globe className="w-3.5 h-3.5" />
                       <span>{ngo.website}</span>
                     </a>
                   </div>
 
                   <button
                     onClick={() => handleNgoFilterSelect(ngo.name)}
-                    className="w-full py-2 px-3 bg-slate-50 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 bg-slate-50 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <span>Search Connected {ngo.name.split(' ')[0]} Hubs</span>
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

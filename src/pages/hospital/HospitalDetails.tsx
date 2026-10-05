@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   Building2, 
@@ -14,29 +14,70 @@ import {
   Users, 
   Droplet, 
   CheckCircle2, 
-  Layers,
-  ArrowRight,
   ExternalLink,
   Lock,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
-import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
-import { getRegisteredHospitals } from '../../utils/hospitalVerificationStore';
+import { hospitalApi } from '../../services/hospitalApi';
 import { HospitalDonorPledgeModal } from '../../components/modals/HospitalDonorPledgeModal';
+import type { Hospital } from '../../types';
 
 export const HospitalDetails = () => {
   const { hospitalId } = useParams<{ hospitalId: string }>();
   const navigate = useNavigate();
 
+  const [hospital, setHospital] = useState<Hospital | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [pledgeModalOpen, setPledgeModalOpen] = useState(false);
   const [selectedPledgeGroup, setSelectedPledgeGroup] = useState<string>('O-');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const hospitals = getRegisteredHospitals();
-  const hospital = hospitals.find((h) => h.id === hospitalId);
+  useEffect(() => {
+    if (!hospitalId) return;
+
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    hospitalApi.getById(hospitalId)
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (res && res.id) {
+          setHospital(res);
+        } else {
+          setError('Hospital not found in database');
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err.message || 'Failed to connect to backend service');
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hospitalId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col items-center justify-center p-4">
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 max-w-md w-full text-center space-y-4 shadow-card-soft">
+          <Loader2 className="w-10 h-10 text-brand-red animate-spin mx-auto" />
+          <h2 className="text-xl font-bold text-slate-900">Loading Hospital Telemetry...</h2>
+          <p className="text-xs text-slate-500">Querying live clinical blood requirements from PostgreSQL...</p>
+        </div>
+      </div>
+    );
+  }
 
   // 21. ERROR HANDLING (404 Not Found)
-  if (!hospital) {
+  if (error || !hospital) {
     return (
       <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
         <div className="bg-[#111827] border border-red-500/30 rounded-3xl p-8 sm:p-10 max-w-lg w-full text-center space-y-6 shadow-2xl">
@@ -49,15 +90,13 @@ export const HospitalDetails = () => {
             <p className="text-sm text-slate-300">
               The hospital identifier <strong className="text-red-400 font-mono">"{hospitalId}"</strong> does not match any registered hospital in the HemoVite network.
             </p>
-            <p className="text-xs text-slate-400">
-              Please select a registered hospital from the HemoVite network.
-            </p>
+            {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
 
           <div className="pt-2">
             <Link
               to="/hospitals"
-              className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all"
+              className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Hospitals</span>
@@ -69,24 +108,25 @@ export const HospitalDetails = () => {
   }
 
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  const stock = hospital.stock || {};
 
-  // Default fallback requirements if not explicitly provided
+  // Default requirements from live stock
   const requirements = hospital.bloodRequirements ?? {
-    'A+': { required: 10, available: hospital.stock['A+'] ?? 10, urgency: 'normal', patients: 2 },
-    'A-': { required: 4, available: hospital.stock['A-'] ?? 2, urgency: 'emergency', patients: 1, requiredWithin: '3 Hours' },
-    'B+': { required: 12, available: hospital.stock['B+'] ?? 15, urgency: 'normal', patients: 3 },
-    'B-': { required: 5, available: hospital.stock['B-'] ?? 2, urgency: 'emergency', patients: 2, requiredWithin: '2 Hours' },
-    'O+': { required: 20, available: hospital.stock['O+'] ?? 18, urgency: 'urgent', patients: 5, requiredWithin: '4 Hours' },
-    'O-': { required: 6, available: hospital.stock['O-'] ?? 1, urgency: 'critical', patients: 2, requiredWithin: '1.5 Hours' },
-    'AB+': { required: 6, available: hospital.stock['AB+'] ?? 8, urgency: 'normal', patients: 1 },
-    'AB-': { required: 3, available: hospital.stock['AB-'] ?? 1, urgency: 'critical', patients: 1, requiredWithin: '2 Hours' },
+    'A+': { required: 10, available: stock['A+'] ?? 10, urgency: 'normal', patients: 2 },
+    'A-': { required: 4, available: stock['A-'] ?? 2, urgency: 'emergency', patients: 1, requiredWithin: '3 Hours' },
+    'B+': { required: 12, available: stock['B+'] ?? 15, urgency: 'normal', patients: 3 },
+    'B-': { required: 5, available: stock['B-'] ?? 2, urgency: 'emergency', patients: 2, requiredWithin: '2 Hours' },
+    'O+': { required: 20, available: stock['O+'] ?? 18, urgency: 'urgent', patients: 5, requiredWithin: '4 Hours' },
+    'O-': { required: 6, available: stock['O-'] ?? 1, urgency: 'critical', patients: 2, requiredWithin: '1.5 Hours' },
+    'AB+': { required: 6, available: stock['AB+'] ?? 8, urgency: 'normal', patients: 1 },
+    'AB-': { required: 3, available: stock['AB-'] ?? 1, urgency: 'critical', patients: 1, requiredWithin: '2 Hours' },
   };
 
-  // 6. Calculate summary metrics from blood requirement data
-  const totalUnitsRequired = Object.values(requirements).reduce((acc, curr) => acc + curr.required, 0);
-  const totalUnitsAvailable = Object.values(requirements).reduce((acc, curr) => acc + curr.available, 0);
+  // Calculate summary metrics
+  const totalUnitsRequired = Object.values(requirements).reduce((acc: number, curr: any) => acc + (curr.required || 0), 0);
+  const totalUnitsAvailable = Object.values(requirements).reduce((acc: number, curr: any) => acc + (curr.available || 0), 0);
   const totalShortage = Object.values(requirements).reduce(
-    (acc, curr) => acc + Math.max(0, curr.required - curr.available),
+    (acc: number, curr: any) => acc + Math.max(0, (curr.required || 0) - (curr.available || 0)),
     0
   );
 
@@ -100,16 +140,17 @@ export const HospitalDetails = () => {
     cancelled: 1,
   };
 
-  // 9. Emergency blood requirements (only emergency or critical)
-  const emergencyRequirements = Object.entries(requirements).filter(([_, data]) => {
+  // Emergency blood requirements
+  const emergencyRequirements = Object.entries(requirements).filter(([_, data]: [string, any]) => {
     return data.urgency === 'emergency' || data.urgency === 'critical';
   });
 
   // Bed details
+  const beds = hospital.beds || 350;
   const bedStats = hospital.bedDetails ?? {
-    total: hospital.beds,
-    occupied: Math.round(hospital.beds * 0.85),
-    available: Math.round(hospital.beds * 0.15),
+    total: beds,
+    occupied: Math.round(beds * 0.85),
+    available: Math.round(beds * 0.15),
   };
 
   // Patient statistics
@@ -120,12 +161,6 @@ export const HospitalDetails = () => {
     normal: 6,
   };
 
-  // Linked blood bank
-  const linkedBloodBank = REGISTERED_BLOOD_BANKS.find(
-    (b) => b.id === hospital.linkedBloodBankId || b.name === hospital.bloodBankLinked
-  );
-
-  // Helper for urgency badges
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency) {
       case 'critical':
@@ -163,7 +198,7 @@ export const HospitalDetails = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col selection:bg-brand-red selection:text-white">
       
-      {/* 5. TOP HEADER BAR */}
+      {/* TOP HEADER BAR */}
       <header className="bg-[#0B1220] text-white border-b border-white/10 sticky top-0 z-40 backdrop-blur-md bg-opacity-95 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <Link
@@ -185,7 +220,7 @@ export const HospitalDetails = () => {
 
           <button
             onClick={() => navigate(`/hospital/${hospital.id}/auth`)}
-            className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-white/15 flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-white/15 flex items-center gap-1.5 transition-all cursor-pointer"
             title="Authorized staff portal"
           >
             <Lock className="w-3.5 h-3.5" />
@@ -197,7 +232,7 @@ export const HospitalDetails = () => {
       {/* MAIN CONTENT */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* 5. HOSPITAL HERO / DETAILS BANNER */}
+        {/* HOSPITAL HERO / DETAILS BANNER */}
         <div className="bg-[#0B1220] text-white rounded-3xl p-6 sm:p-8 border border-white/10 shadow-2xl relative overflow-hidden space-y-6">
           <div className="absolute top-0 right-0 w-96 h-96 bg-brand-red/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -237,15 +272,15 @@ export const HospitalDetails = () => {
                     className="inline-flex items-center gap-1.5 text-slate-200 hover:text-white font-mono font-bold bg-white/5 hover:bg-white/10 px-3 py-1 rounded-lg border border-white/10 transition-colors"
                   >
                     <Phone className="w-3.5 h-3.5 text-brand-red" />
-                    <span>📞 {hospital.phone}</span>
+                    <span>📞 {hospital.phone || 'N/A'}</span>
                   </a>
 
                   <a
-                    href={`tel:${hospital.emergencyContact}`}
+                    href={`tel:${hospital.emergencyContact || hospital.phone}`}
                     className="inline-flex items-center gap-1.5 text-red-300 hover:text-red-200 font-mono font-bold bg-red-950/50 border border-red-500/40 px-3 py-1 rounded-lg transition-colors"
                   >
                     <AlertTriangle className="w-3.5 h-3.5 text-brand-bright" />
-                    <span>24/7 Trauma Emergency: {hospital.emergencyContact}</span>
+                    <span>24/7 Trauma Emergency: {hospital.emergencyContact || hospital.phone || 'N/A'}</span>
                   </a>
                 </div>
               </div>
@@ -258,7 +293,7 @@ export const HospitalDetails = () => {
               </span>
               <div className="font-bold text-sm text-white flex items-center gap-2">
                 <Droplet className="w-4 h-4 text-brand-bright shrink-0" />
-                <span className="truncate">{hospital.bloodBankLinked}</span>
+                <span className="truncate">{hospital.bloodBankLinked || 'Central Red Cross Storage'}</span>
               </div>
               <div className="flex items-center justify-between text-xs pt-1">
                 <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
@@ -279,7 +314,7 @@ export const HospitalDetails = () => {
           </div>
         </div>
 
-        {/* 13. HOSPITAL OVERVIEW SECTION */}
+        {/* HOSPITAL OVERVIEW SECTION */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Bed Capacity Overview */}
           <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-card-soft space-y-4">
@@ -290,7 +325,7 @@ export const HospitalDetails = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">Hospital Bed Capacity</h3>
-                  <p className="text-xs text-slate-400">{hospital.icuCapacity}</p>
+                  <p className="text-xs text-slate-400">{hospital.icuCapacity || '45 ICU Beds'}</p>
                 </div>
               </div>
               <span className="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">
@@ -317,12 +352,12 @@ export const HospitalDetails = () => {
             <div className="space-y-1.5 pt-1">
               <div className="flex justify-between text-xs font-semibold text-slate-600">
                 <span>Occupancy Rate</span>
-                <span>{Math.round((bedStats.occupied / bedStats.total) * 100)}%</span>
+                <span>{Math.round((bedStats.occupied / (bedStats.total || 1)) * 100)}%</span>
               </div>
               <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex">
                 <div 
                   className="bg-brand-red rounded-full" 
-                  style={{ width: `${Math.round((bedStats.occupied / bedStats.total) * 100)}%` }} 
+                  style={{ width: `${Math.round((bedStats.occupied / (bedStats.total || 1)) * 100)}%` }} 
                 />
               </div>
             </div>
@@ -365,12 +400,12 @@ export const HospitalDetails = () => {
                 <Activity className="w-4 h-4 text-brand-red shrink-0" />
                 <span>Critical Surgery & Trauma OT Status:</span>
               </span>
-              <span className="font-bold text-slate-900">Active Live Matching</span>
+              <span className="font-bold text-slate-900">Active PostgreSQL Sync</span>
             </div>
           </div>
         </div>
 
-        {/* 6. BLOOD REQUIREMENT OVERVIEW (6 METRIC CARDS) */}
+        {/* BLOOD REQUIREMENT OVERVIEW (6 METRIC CARDS) */}
         <div className="space-y-4">
           <div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900">
@@ -450,7 +485,7 @@ export const HospitalDetails = () => {
           </div>
         </div>
 
-        {/* 9. EMERGENCY BLOOD REQUIREMENTS (DEDICATED SECTION) */}
+        {/* EMERGENCY BLOOD REQUIREMENTS */}
         {emergencyRequirements.length > 0 && (
           <div className="bg-red-50/60 border border-red-200/90 rounded-3xl p-6 sm:p-7 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-red-200/60 pb-3">
@@ -488,8 +523,8 @@ export const HospitalDetails = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
-              {emergencyRequirements.map(([group, item]) => {
-                const shortage = Math.max(0, item.required - item.available);
+              {emergencyRequirements.map(([group, item]: [string, any]) => {
+                const shortage = Math.max(0, (item.required || 0) - (item.available || 0));
                 const isCritical = item.urgency === 'critical';
 
                 return (
@@ -517,7 +552,7 @@ export const HospitalDetails = () => {
                             : 'bg-rose-100 text-rose-800'
                         }`}
                       >
-                        {item.urgency.toUpperCase()}
+                        {item.urgency?.toUpperCase()}
                       </span>
                     </div>
 
@@ -550,7 +585,7 @@ export const HospitalDetails = () => {
           </div>
         )}
 
-        {/* 7 & 8. BLOOD GROUP REQUIREMENT TABLE */}
+        {/* BLOOD GROUP REQUIREMENT TABLE */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-card-soft space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
@@ -584,8 +619,8 @@ export const HospitalDetails = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {bloodGroups.map((group) => {
-                  const item = requirements[group] ?? { required: 0, available: 0, urgency: 'normal' };
-                  const shortage = Math.max(0, item.required - item.available);
+                  const item = (requirements as any)[group] ?? { required: 0, available: 0, urgency: 'normal' };
+                  const shortage = Math.max(0, (item.required || 0) - (item.available || 0));
                   const isCriticalOrEmergency = item.urgency === 'critical' || item.urgency === 'emergency';
 
                   return (
@@ -618,7 +653,7 @@ export const HospitalDetails = () => {
                         {item.available} <span className="text-xs font-normal text-slate-400">Units</span>
                       </td>
 
-                      {/* Shortage (Auto-calculated: Required - Available, never negative) */}
+                      {/* Shortage */}
                       <td className="py-4 px-4 font-mono font-black text-base">
                         {shortage > 0 ? (
                           <span className="text-brand-bright bg-red-50 px-2 py-0.5 rounded-md border border-red-100">
@@ -644,7 +679,7 @@ export const HospitalDetails = () => {
           </div>
         </div>
 
-        {/* 10. BLOOD REQUEST STATUS */}
+        {/* BLOOD REQUEST STATUS */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-card-soft space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
@@ -698,7 +733,7 @@ export const HospitalDetails = () => {
           </div>
         </div>
 
-        {/* 12. CURRENT BLOOD AVAILABILITY */}
+        {/* CURRENT BLOOD AVAILABILITY */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-card-soft space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
@@ -716,7 +751,7 @@ export const HospitalDetails = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {bloodGroups.map((grp) => {
-              const units = requirements[grp]?.available ?? 0;
+              const units = (requirements as any)[grp]?.available ?? 0;
               const isCrit = units <= 2;
               const isLow = units > 2 && units <= 5;
 
@@ -766,148 +801,6 @@ export const HospitalDetails = () => {
           </div>
         </div>
 
-        {/* 11. CURRENT BLOOD REQUESTS (PUBLIC / ANONYMIZED) */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-card-soft space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div>
-              <div className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                <Layers className="w-3.5 h-3.5 text-brand-red" />
-                <span>Public Transparency Ledger</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                Current Blood Requests
-              </h2>
-              <p className="text-xs text-slate-500">
-                Anonymized active clinical requisitions processed through HemoVite's emergency grid.
-              </p>
-            </div>
-
-            <span className="text-[11px] text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1 rounded-xl">
-              🔒 Patient privacy protected
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-4 rounded-l-xl">Request ID</th>
-                  <th className="py-3 px-4">Blood Group</th>
-                  <th className="py-3 px-4">Units Required</th>
-                  <th className="py-3 px-4">Urgency</th>
-                  <th className="py-3 px-4">Required By</th>
-                  <th className="py-3 px-4 rounded-r-xl">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                {(hospital.recentPublicRequests ?? [
-                  { id: 'REQ-1024', bloodGroup: 'O-', unitsRequired: 3, urgency: 'critical', requiredBy: 'Within 2 Hours', status: 'Searching' },
-                  { id: 'REQ-1025', bloodGroup: 'B+', unitsRequired: 2, urgency: 'urgent', requiredBy: 'Today', status: 'Partially Fulfilled' },
-                  { id: 'REQ-1026', bloodGroup: 'AB-', unitsRequired: 2, urgency: 'critical', requiredBy: 'Within 1.5 Hours', status: 'Searching' },
-                  { id: 'REQ-1027', bloodGroup: 'B-', unitsRequired: 2, urgency: 'emergency', requiredBy: 'Within 4 Hours', status: 'Pending' },
-                ]).map((req) => (
-                  <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      {req.id}
-                    </td>
-
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1 font-black px-2.5 py-0.5 rounded-md bg-red-50 text-brand-red border border-red-200 font-mono">
-                        {req.bloodGroup}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
-                      {req.unitsRequired} Units
-                    </td>
-
-                    <td className="py-3.5 px-4">
-                      {getUrgencyBadge(req.urgency)}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-slate-600 font-medium">
-                      {req.requiredBy}
-                    </td>
-
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                          req.status === 'Searching'
-                            ? 'bg-red-50 text-red-700 border border-red-200 animate-pulse'
-                            : req.status === 'Partially Fulfilled'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : req.status === 'Dispatched'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
-                      >
-                        <span>{req.status}</span>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* 14. LINKED BLOOD BANK SECTION */}
-        <div className="bg-gradient-to-r from-[#0B1220] to-[#111827] text-white rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-xs font-bold uppercase tracking-wider">
-                <Droplet className="w-3.5 h-3.5 fill-current" />
-                <span>Affiliated Transfusion Center</span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-black text-white">
-                Linked Blood Bank: {hospital.bloodBankLinked}
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-400">
-                Connected directly to HemoVite's national component bank network.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-xs font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>🟢 Operational 24/7</span>
-              </span>
-
-              {hospital.linkedBloodBankId && (
-                <Link
-                  to={`/blood-bank/${hospital.linkedBloodBankId}`}
-                  className="px-4 py-2 bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1.5 transition-all"
-                >
-                  <span>View Full Hub Inventory</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Hub Blood Stock Snippet */}
-          <div className="space-y-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-              Live Stock Availability at Connected Hub
-            </span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-xs">
-              {bloodGroups.map((grp) => {
-                const units = linkedBloodBank?.inventory[grp] ?? hospital.stock[grp] ?? 10;
-                return (
-                  <div
-                    key={grp}
-                    className="bg-white/5 border border-white/10 rounded-xl p-2.5 text-center space-y-1 hover:bg-white/10 transition-colors"
-                  >
-                    <span className="font-bold text-white text-xs block">{grp}</span>
-                    <span className="font-mono text-sm font-black text-brand-bright block">{units}</span>
-                    <span className="text-[10px] text-slate-400 block">Units</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
         {/* BOTTOM NAV / BACK CTA */}
         <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <Link
@@ -920,7 +813,7 @@ export const HospitalDetails = () => {
 
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
+            className="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
           >
             Back to Top ↑
           </button>
@@ -967,7 +860,7 @@ export const HospitalDetails = () => {
           </div>
           <button
             onClick={() => setToastMessage(null)}
-            className="text-slate-400 hover:text-white text-xs font-bold p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-slate-400 hover:text-white text-xs font-bold p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
