@@ -1,0 +1,15 @@
+HemoVite Mobile Application (Release Build v2.4.0)
+Package: ai.hemovite.mobile
+Build: Release-2026-v2.4
+Target OS: Android 8.0+
+
+Features Included:
+- Real-time Shortage Warning Broadcasts
+- 1-Tap Emergency Blood Request
+- Verified Smart Donor Matching Radar
+- Hospital & Blood Bank Stock Tracker
+- Geofenced Emergency Notifications (FCM)
+- Offline-ready verified emergency contacts
+
+Developed for the Smart Healthcare AI Network.
+Predict. Prevent. Save Lives.
