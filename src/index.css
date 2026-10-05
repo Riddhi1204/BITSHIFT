@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: #F8FAFC;
+    color: #0F172A;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0B1220;
+}
+::-webkit-scrollbar-thumb {
+  background: #7F1D1D;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B91C1C;
+}
+
+/* Glassmorphism Classes */
+.glass-nav {
+  background: rgba(11, 18, 32, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card-dark {
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card-light {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+/* Access Tile Hover Rules */
+.access-tile-card {
+  transition: all 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.access-tile-card:hover {
+  background: linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%) !important;
+  transform: translateY(-6px);
+  box-shadow: 0 20px 35px -8px rgba(127, 29, 29, 0.45);
+}
+
+.access-tile-card:hover .tile-title,
+.access-tile-card:hover .tile-desc,
+.access-tile-card:hover .tile-icon-wrap,
+.access-tile-card:hover .tile-arrow {
+  color: #FFFFFF !important;
+}
+
+.access-tile-card:hover .tile-icon-bg {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #FFFFFF !important;
+}
+
+.access-tile-card:hover .tile-arrow-bg {
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #FFFFFF !important;
+}
+
+/* Glow Keyframes */
+@keyframes heartPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.animate-heart-pulse {
+  animation: heartPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes gridGlow {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.3; }
+}
+
+.bg-hero-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
