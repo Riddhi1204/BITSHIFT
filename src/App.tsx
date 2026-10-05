@@ -38,6 +38,18 @@ import { CitizenProfile } from './pages/citizen/CitizenProfile';
 import { CitizenSettings } from './pages/citizen/CitizenSettings';
 import { CitizenLayout } from './components/citizen/CitizenLayout';
 
+// Government Flow
+import { GovernmentAuth } from './pages/government/GovernmentAuth';
+import { GovernmentForgotPassword } from './pages/government/GovernmentForgotPassword';
+import { GovernmentDashboard } from './pages/government/GovernmentDashboard';
+import { GovernmentHospitals } from './pages/government/GovernmentHospitals';
+import { GovernmentHospitalDetails } from './pages/government/GovernmentHospitalDetails';
+import { GovernmentHotspots } from './pages/government/GovernmentHotspots';
+import { GovernmentDonations } from './pages/government/GovernmentDonations';
+import { GovernmentSupply } from './pages/government/GovernmentSupply';
+import { GovernmentReports } from './pages/government/GovernmentReports';
+import { GovernmentSettings } from './pages/government/GovernmentSettings';
+
 export function App() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
@@ -52,6 +64,10 @@ export function App() {
     }
     if (role === 'blood_bank') {
       navigate('/blood-banks');
+      return;
+    }
+    if (role === 'government') {
+      navigate('/government/login');
       return;
     }
     if (role === 'citizen') {
@@ -133,6 +149,19 @@ export function App() {
         <Route path="/blood-bank/:bloodBankId/requests" element={<BloodBankRequests />} />
         <Route path="/blood-bank/:bloodBankId/donors" element={<BloodBankDonors />} />
         <Route path="/blood-bank/:bloodBankId/settings" element={<BloodBankSettings />} />
+
+        {/* GOVERNMENT PORTAL FLOW */}
+        <Route path="/government/login" element={<GovernmentAuth />} />
+        <Route path="/government/register" element={<GovernmentAuth />} />
+        <Route path="/government/forgot-password" element={<GovernmentForgotPassword />} />
+        <Route path="/government/dashboard" element={<GovernmentDashboard />} />
+        <Route path="/government/hospitals" element={<GovernmentHospitals />} />
+        <Route path="/government/hospitals/:hospitalId" element={<GovernmentHospitalDetails />} />
+        <Route path="/government/hotspots" element={<GovernmentHotspots />} />
+        <Route path="/government/donations" element={<GovernmentDonations />} />
+        <Route path="/government/supply" element={<GovernmentSupply />} />
+        <Route path="/government/reports" element={<GovernmentReports />} />
+        <Route path="/government/settings" element={<GovernmentSettings />} />
 
         {/* FALLBACK REDIRECT */}
         <Route path="*" element={<Navigate to="/" replace />} />
