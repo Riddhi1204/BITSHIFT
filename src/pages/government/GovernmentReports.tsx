@@ -7,6 +7,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import { GovernmentLayout } from '../../components/government/GovernmentLayout';
+import { ExpiryWasteSection } from '../../components/inventory/ExpiryWasteSection';
 
 export const GovernmentReports = () => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -17,6 +18,30 @@ export const GovernmentReports = () => {
   };
 
   const reports = [
+    {
+      id: 'REP-WASTE-2026',
+      title: 'National Blood Unit Expiry & Waste Reduction Audit',
+      type: 'Statutory Biohazard Audit',
+      date: 'October 05, 2026',
+      size: '3.6 MB',
+      status: 'Finalized',
+    },
+    {
+      id: 'REP-SHELFLIFE-01',
+      title: 'Blood Group Wastage Velocity & Component Shelf-Life Dossier',
+      type: 'Quality Assurance Telemetry',
+      date: 'September 30, 2026',
+      size: '2.8 MB',
+      status: 'Generated',
+    },
+    {
+      id: 'REP-COLDCHAIN-FAIL',
+      title: 'Cold-Chain Temperature Excursion & Damaged Bag Disposal Log',
+      type: 'Facility Incident Ledger',
+      date: 'September 22, 2026',
+      size: '1.7 MB',
+      status: 'Finalized',
+    },
     {
       id: 'REP-2026-Q1',
       title: 'National Blood Supply & Reserve Health Audit (Q1 2026)',
@@ -127,6 +152,13 @@ export const GovernmentReports = () => {
             ))}
           </div>
         </div>
+
+        {/* NATIONAL EXPIRY & STATUTORY BIOHAZARD DISCARD AUDIT */}
+        <ExpiryWasteSection
+          role="government"
+          title="National Biohazard Discard & Expiry Report Ledger"
+          subtitle="Generate, filter, and audit regional blood waste records across verified health nodes"
+        />
 
       </div>
     </GovernmentLayout>

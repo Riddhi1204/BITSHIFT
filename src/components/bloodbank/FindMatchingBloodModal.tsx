@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Phone, MapPin, CheckCircle2, Sparkles, Send } from 'lucide-react';
 import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
+import { bloodBankApi } from '../../services/bloodBankApi';
+import type { BloodBank } from '../../types';
 
 interface FindMatchingBloodModalProps {
   isOpen: boolean;
@@ -15,20 +17,34 @@ export const FindMatchingBloodModal = ({
   currentBloodBankId,
   initialGroup = 'O-',
 }: FindMatchingBloodModalProps) => {
+  const [allBanks, setAllBanks] = useState<BloodBank[]>(REGISTERED_BLOOD_BANKS);
   const [targetGroup, setTargetGroup] = useState(initialGroup);
   const [unitsNeeded, setUnitsNeeded] = useState('8');
   const [urgency, setUrgency] = useState('Emergency (< 30 Mins)');
   const [requestedSuccess, setRequestedSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchAll = async () => {
+      try {
+        const list = await bloodBankApi.getAll();
+        if (list && list.length > 0) {
+          setAllBanks(list);
+        }
+      } catch {}
+    };
+    fetchAll();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const bloodGroups = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
 
   // Filter and rank matching blood banks with availability
-  const matchingBanks = REGISTERED_BLOOD_BANKS
-    .filter((b) => b.id !== currentBloodBankId)
+  const matchingBanks = allBanks
+    .filter((b) => b.id !== currentBloodBankId && b.registrationNumber !== currentBloodBankId)
     .map((b) => {
-      const availableUnits = b.inventory[targetGroup] ?? 0;
+      const availableUnits = b.inventory ? (b.inventory[targetGroup] ?? 0) : 0;
       return {
         ...b,
         availableForGroup: availableUnits,

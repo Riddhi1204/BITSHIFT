@@ -9,6 +9,7 @@ import citizenRoutes from './routes/citizenRoutes.js';
 import bloodRequestRoutes from './routes/bloodRequestRoutes.js';
 import donationRoutes from './routes/donationRoutes.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 import prisma from './lib/prisma.js';
 
 dotenv.config();
@@ -46,6 +47,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // Mount Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/blood-banks', bloodBankRoutes);
 app.use('/api/government', governmentRoutes);

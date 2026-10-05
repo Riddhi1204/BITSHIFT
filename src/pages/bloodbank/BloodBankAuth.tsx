@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Droplet, 
@@ -14,15 +14,21 @@ import {
   EyeOff, 
   KeyRound, 
   ArrowRight, 
-  Sparkles 
+  Sparkles,
+  Loader2 
 } from 'lucide-react';
 import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
+import { bloodBankApi } from '../../services/bloodBankApi';
+import type { BloodBank } from '../../types';
 
 export const BloodBankAuth = () => {
   const { bloodBankId } = useParams<{ bloodBankId: string }>();
   const navigate = useNavigate();
 
-  const bloodBank = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId);
+  const [bloodBank, setBloodBank] = useState<BloodBank | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,7 +36,7 @@ export const BloodBankAuth = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState(bloodBank ? bloodBank.email : '');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('Admin@2026');
 
   // Register form state
@@ -46,8 +52,66 @@ export const BloodBankAuth = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // INVALID BLOOD BANK ERROR STATE (Requirement 25)
-  if (!bloodBank) {
+  useEffect(() => {
+    if (!bloodBankId) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    setFetchError(null);
+
+    bloodBankApi.getById(bloodBankId)
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (res && res.id) {
+          setBloodBank(res);
+          setLoginEmail(res.email || '');
+        } else {
+          // Check fallback mock data
+          const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId);
+          if (mock) {
+            setBloodBank(mock);
+            setLoginEmail(mock.email || '');
+          } else {
+            setFetchError('Blood bank facility not found');
+          }
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId);
+        if (mock) {
+          setBloodBank(mock);
+          setLoginEmail(mock.email || '');
+        } else {
+          setFetchError(err.message || 'Failed to connect to backend service');
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [bloodBankId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
+        <div className="bg-[#111827] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
+          <Loader2 className="w-10 h-10 text-brand-red animate-spin mx-auto" />
+          <h2 className="text-xl font-bold text-white">Loading Blood Bank Portal...</h2>
+          <p className="text-xs text-slate-400">Verifying facility credentials with central registry...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // INVALID BLOOD BANK ERROR STATE
+  if (fetchError || !bloodBank) {
     return (
       <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
         <div className="bg-[#111827] border border-red-500/30 rounded-3xl p-8 sm:p-10 max-w-lg w-full text-center space-y-6 shadow-2xl">
@@ -81,6 +145,18 @@ export const BloodBankAuth = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    // Set facility state in localStorage
+    const staffSession = {
+      id: `bb_admin_${Date.now()}`,
+      name: bloodBank.name + ' Administrator',
+      email: loginEmail,
+      bloodBankId: bloodBank.id,
+      bloodBankName: bloodBank.name,
+    };
+    localStorage.setItem('hemovite_bloodbank_staff', JSON.stringify(staffSession));
+    localStorage.setItem('hemovite_role', 'blood_bank_staff');
+    window.dispatchEvent(new Event('hemovite_auth_changed'));
+
     triggerToast(`Authenticated as Blood Bank Administrator for ${bloodBank.name}!`);
     setTimeout(() => {
       navigate(`/blood-bank/${bloodBank.id}/dashboard`);
@@ -94,6 +170,18 @@ export const BloodBankAuth = () => {
       return;
     }
     setRegError(null);
+
+    const staffSession = {
+      id: `bb_admin_${Date.now()}`,
+      name: adminName || bloodBank.name + ' Administrator',
+      email: adminEmail,
+      bloodBankId: bloodBank.id,
+      bloodBankName: bloodBank.name,
+    };
+    localStorage.setItem('hemovite_bloodbank_staff', JSON.stringify(staffSession));
+    localStorage.setItem('hemovite_role', 'blood_bank_staff');
+    window.dispatchEvent(new Event('hemovite_auth_changed'));
+
     triggerToast(`Administrator registered for ${bloodBank.name}! Redirecting to dashboard...`);
     setTimeout(() => {
       navigate(`/blood-bank/${bloodBank.id}/dashboard`);
@@ -101,7 +189,7 @@ export const BloodBankAuth = () => {
   };
 
   const fillDemoCredentials = () => {
-    setLoginEmail(bloodBank.email);
+    setLoginEmail(bloodBank.email || 'admin@bloodbank.org');
     setLoginPassword('BloodBank@2026');
     triggerToast('Demo blood bank administrator credentials loaded!');
   };
@@ -180,7 +268,7 @@ export const BloodBankAuth = () => {
             <button
               type="button"
               onClick={() => setActiveTab('login')}
-              className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === 'login'
                   ? 'bg-brand-red text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -191,7 +279,7 @@ export const BloodBankAuth = () => {
             <button
               type="button"
               onClick={() => setActiveTab('register')}
-              className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === 'register'
                   ? 'bg-brand-red text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -212,7 +300,7 @@ export const BloodBankAuth = () => {
                   <button
                     type="button"
                     onClick={fillDemoCredentials}
-                    className="text-[11px] text-blue-400 hover:text-blue-300 font-normal flex items-center gap-1"
+                    className="text-[11px] text-blue-400 hover:text-blue-300 font-normal flex items-center gap-1 cursor-pointer"
                   >
                     <Sparkles className="w-3 h-3" /> Fill Demo Credentials
                   </button>
@@ -246,7 +334,7 @@ export const BloodBankAuth = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200"
+                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -268,7 +356,7 @@ export const BloodBankAuth = () => {
                 <button
                   type="button"
                   onClick={() => triggerToast(`Password reset link dispatched to ${loginEmail || bloodBank.email}`)}
-                  className="text-red-400 hover:text-red-300 font-medium"
+                  className="text-red-400 hover:text-red-300 font-medium cursor-pointer"
                 >
                   Forgot password?
                 </button>
@@ -277,7 +365,7 @@ export const BloodBankAuth = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-red-950/50 hover:shadow-brand-red/40 transition-all flex items-center justify-center gap-2 group"
+                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-red-950/50 hover:shadow-brand-red/40 transition-all flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <span>Login to {bloodBank.name} Dashboard</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -297,7 +385,7 @@ export const BloodBankAuth = () => {
                 </div>
               )}
 
-              {/* PRE-FILLED & LOCKED BLOOD BANK NAME & ID (Requirement 9) */}
+              {/* PRE-FILLED & LOCKED BLOOD BANK NAME & ID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
@@ -411,7 +499,7 @@ export const BloodBankAuth = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-red-950/50 hover:shadow-brand-red/40 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-red-950/50 hover:shadow-brand-red/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4" />
                 <span>Register Blood Bank Administrator</span>
@@ -419,6 +507,25 @@ export const BloodBankAuth = () => {
 
             </form>
           )}
+
+          {/* GOOGLE AUTH DIVIDER & BUTTON */}
+          <div className="pt-2 space-y-4">
+            <div className="relative flex items-center">
+              <div className="flex-grow border-t border-white/10"></div>
+              <span className="flex-shrink-0 mx-4 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+                Or Blood Bank Staff SSO
+              </span>
+              <div className="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <GoogleSignInButton
+              role="blood_bank_staff"
+              facilityId={bloodBank.id}
+              returnUrl={`/blood-bank/${bloodBank.id}/dashboard`}
+              label="Continue with Google (Blood Bank Staff)"
+              variant="light"
+            />
+          </div>
 
         </div>
       </main>

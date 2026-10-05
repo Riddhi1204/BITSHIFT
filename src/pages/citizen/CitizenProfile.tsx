@@ -5,26 +5,49 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export const CitizenProfile = () => {
   const navigate = useNavigate();
-  const { citizenUser, logoutCitizen } = useAuth();
+  const { citizenUser, logoutCitizen, refreshAuth } = useAuth();
   
   const [profile, setProfile] = useState({
-    name: citizenUser?.name || 'John Doe',
-    email: citizenUser?.email || 'john.doe@example.com',
-    phone: '+91 98765 43210',
-    bloodGroup: 'O+',
-    age: 28,
-    location: 'Ranchi, Jharkhand',
-    totalDonations: 6
+    name: citizenUser?.name || 'Citizen User',
+    email: citizenUser?.email || '',
+    phone: citizenUser?.phone || 'Not provided',
+    bloodGroup: citizenUser?.bloodGroup || 'Not set',
+    age: 'Not specified',
+    location: citizenUser?.city ? `${citizenUser.city}${citizenUser.state ? ', ' + citizenUser.state : ''}` : 'Location unset',
+    totalDonations: 0
   });
 
   useEffect(() => {
-    if (citizenUser) {
-      setProfile(prev => ({
-        ...prev,
-        name: citizenUser.name,
-        email: citizenUser.email
-      }));
-    }
+    const loadProfile = async () => {
+      try {
+        const me = await authApi.getMe();
+        if (me?.user) {
+          const u = me.user;
+          const cp = me.citizenProfile;
+          setProfile({
+            name: u.fullName || u.name || citizenUser?.name || 'Citizen User',
+            email: u.email || citizenUser?.email || '',
+            phone: u.phone || citizenUser?.phone || 'Not provided',
+            bloodGroup: u.bloodGroup || citizenUser?.bloodGroup || 'Not set',
+            age: cp?.age ? `${cp.age} Years` : 'Not specified',
+            location: cp?.address || (u.city ? `${u.city}${u.state ? ', ' + u.state : ''}` : 'Location unset'),
+            totalDonations: cp?.totalDonations ?? 0
+          });
+        }
+      } catch {
+        if (citizenUser) {
+          setProfile(prev => ({
+            ...prev,
+            name: citizenUser.name,
+            email: citizenUser.email,
+            phone: citizenUser.phone || prev.phone,
+            bloodGroup: citizenUser.bloodGroup || prev.bloodGroup,
+            location: citizenUser.city ? `${citizenUser.city}${citizenUser.state ? ', ' + citizenUser.state : ''}` : prev.location,
+          }));
+        }
+      }
+    };
+    loadProfile();
   }, [citizenUser]);
 
   const handleLogout = () => {
@@ -115,7 +138,7 @@ export const CitizenProfile = () => {
                   <Calendar className="w-3.5 h-3.5" /> Age
                 </label>
                 <div className="text-base font-bold text-white bg-slate-900/50 px-4 py-3 rounded-xl border border-white/5">
-                  {profile.age} Years
+                  {typeof profile.age === 'number' ? `${profile.age} Years` : profile.age}
                 </div>
               </div>
               <div className="sm:col-span-2 space-y-1">

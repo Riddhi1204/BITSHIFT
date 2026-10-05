@@ -1,32 +1,69 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   Layers, 
   Plus, 
   CheckCircle2, 
   AlertCircle, 
-  History 
+  History,
+  Loader2
 } from 'lucide-react';
 import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
 import { BloodBankNav } from '../../components/bloodbank/BloodBankNav';
 import { getBloodGroupStatus } from '../../components/bloodbank/BloodAvailabilityBadge';
 import { UpdateInventoryModal } from '../../components/bloodbank/UpdateInventoryModal';
+import { ExpiryWasteSection } from '../../components/inventory/ExpiryWasteSection';
+import { bloodBankApi } from '../../services/bloodBankApi';
+import type { BloodBank } from '../../types';
 
 export const BloodBankInventory = () => {
   const { bloodBankId } = useParams<{ bloodBankId: string }>();
-  const bloodBank = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId);
+  const [bloodBank, setBloodBank] = useState<BloodBank | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [stockState, setStockState] = useState<Record<string, number>>(
-    bloodBank ? bloodBank.inventory : { 'O-': 9, 'O+': 61, 'A+': 42, 'A-': 12, 'B+': 38, 'B-': 7, 'AB+': 21, 'AB-': 4 }
-  );
+  const [stockState, setStockState] = useState<Record<string, number>>({
+    'O-': 9, 'O+': 61, 'A+': 42, 'A-': 12, 'B+': 38, 'B-': 7, 'AB+': 21, 'AB-': 4
+  });
 
-  const [reservedState] = useState<Record<string, number>>(
-    bloodBank?.reservedStock || { 'O-': 4, 'A+': 5, 'B+': 2 }
-  );
+  const [reservedState] = useState<Record<string, number>>({
+    'O-': 4, 'A+': 5, 'B+': 2
+  });
 
-  const [expiredState] = useState<Record<string, number>>(
-    bloodBank?.expiredStock || { 'A-': 1 }
-  );
+  const [expiredState] = useState<Record<string, number>>({
+    'A-': 1
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBank = async () => {
+      if (!bloodBankId) return;
+      try {
+        setLoading(true);
+        const data = await bloodBankApi.getById(bloodBankId);
+        if (!isMounted) return;
+        if (data && data.id) {
+          setBloodBank(data);
+          if (data.inventory) setStockState(data.inventory);
+        } else {
+          const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId || b.registrationNumber === bloodBankId);
+          if (mock) {
+            setBloodBank(mock);
+            if (mock.inventory) setStockState(mock.inventory);
+          }
+        }
+      } catch (err) {
+        const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId || b.registrationNumber === bloodBankId);
+        if (mock && isMounted) {
+          setBloodBank(mock);
+          if (mock.inventory) setStockState(mock.inventory);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchBank();
+    return () => { isMounted = false; };
+  }, [bloodBankId]);
 
   const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'critical' | 'low'>('all');
@@ -44,12 +81,24 @@ export const BloodBankInventory = () => {
     setTimeout(() => setToastMessage(null), 3800);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
+        <div className="bg-[#111827] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
+          <Loader2 className="w-10 h-10 text-brand-red animate-spin mx-auto" />
+          <h2 className="text-xl font-bold text-white">Loading Facility Inventory...</h2>
+        </div>
+      </div>
+    );
+  }
+
   if (!bloodBank) {
     return (
       <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
         <div className="bg-[#111827] border border-red-500/30 rounded-3xl p-8 max-w-lg w-full text-center space-y-4">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
           <h2 className="text-2xl font-black text-white">Blood Bank Not Found</h2>
+          <p className="text-sm text-slate-400">Identifier <strong className="text-red-400 font-mono">"{bloodBankId}"</strong> does not exist.</p>
           <Link to="/blood-banks" className="inline-block px-5 py-2.5 bg-brand-red text-white font-bold text-xs rounded-xl">
             View Registered Blood Banks
           </Link>
@@ -283,6 +332,14 @@ export const BloodBankInventory = () => {
           </div>
 
         </div>
+
+        {/* EXPIRY & WASTE MANAGEMENT SECTION */}
+        <ExpiryWasteSection
+          role="blood_bank"
+          bloodBankId={bloodBank.id}
+          title="Component Shelf-Life & Waste Tracking"
+          subtitle={`Detailed cold-chain batch expiry schedule and discard records for ${bloodBank.name}`}
+        />
 
         {/* AUDIT LOG TRANSACTION HISTORY */}
         <div className="bg-[#111827] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">

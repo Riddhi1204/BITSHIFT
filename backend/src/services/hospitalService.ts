@@ -112,12 +112,12 @@ export class HospitalService {
     if (!hospital) return null;
 
     const requests = await prisma.bloodRequest.findMany({
-      where: { hospitalId },
+      where: { hospitalId: hospital.id },
       orderBy: { createdAt: 'desc' },
     });
 
     const donations = await prisma.donation.findMany({
-      where: { hospitalId },
+      where: { hospitalId: hospital.id },
       include: {
         donor: {
           select: { id: true, fullName: true, phone: true, bloodGroup: true, gender: true },
@@ -128,7 +128,7 @@ export class HospitalService {
 
     const transfers = await prisma.inventoryTransfer.findMany({
       where: {
-        OR: [{ sourceHospitalId: hospitalId }, { destinationHospitalId: hospitalId }],
+        OR: [{ sourceHospitalId: hospital.id }, { destinationHospitalId: hospital.id }],
       },
       include: {
         sourceBloodBank: { select: { id: true, name: true } },
@@ -139,7 +139,7 @@ export class HospitalService {
     });
 
     const predictions = await prisma.shortagePrediction.findMany({
-      where: { hospitalId },
+      where: { hospitalId: hospital.id },
       orderBy: { predictionDate: 'desc' },
     });
 
@@ -158,8 +158,11 @@ export class HospitalService {
    * Update blood stock for a hospital
    */
   static async updateStock(hospitalId: string, bloodGroup: string, change: number) {
+    const hospital = await this.getHospitalById(hospitalId);
+    const resolvedId = hospital ? hospital.id : hospitalId;
+
     const existing = await prisma.bloodInventory.findFirst({
-      where: { hospitalId, bloodGroup },
+      where: { hospitalId: resolvedId, bloodGroup },
     });
 
     if (existing) {
@@ -175,7 +178,7 @@ export class HospitalService {
     } else {
       return await prisma.bloodInventory.create({
         data: {
-          hospitalId,
+          hospitalId: resolvedId,
           bloodGroup,
           unitsAvailable: Math.max(0, change),
           minimumRequiredUnits: 5,

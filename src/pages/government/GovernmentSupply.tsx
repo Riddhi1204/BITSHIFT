@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { GovernmentLayout } from '../../components/government/GovernmentLayout';
 import { governmentApi } from '../../services/governmentApi';
+import { ExpiryWasteSection } from '../../components/inventory/ExpiryWasteSection';
 import type { RegionalBloodSupply } from '../../types';
 
 export const GovernmentSupply = () => {
@@ -329,6 +330,13 @@ export const GovernmentSupply = () => {
             );
           })}
         </div>
+
+        {/* NATIONAL EXPIRY & WASTE MANAGEMENT AGGREGATOR */}
+        <ExpiryWasteSection
+          role="government"
+          title="Supply Expiry & Regulatory Discard Matrix"
+          subtitle="Real-time multi-regional batch shelf-life analytics and waste prevention telemetry"
+        />
 
       </div>
     </GovernmentLayout>

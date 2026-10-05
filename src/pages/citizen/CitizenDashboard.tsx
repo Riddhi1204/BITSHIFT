@@ -23,6 +23,15 @@ export const CitizenDashboard = () => {
     { id: 2, name: 'RIMS Hospital', distance: '4.8 km', availableGroups: ['O-', 'B-'], status: 'Limited', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
   ]);
 
+  const [userProfile, setUserProfile] = useState<any>(() => {
+    try {
+      const raw = localStorage.getItem('hemovite_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,6 +42,9 @@ export const CitizenDashboard = () => {
       .then((res: any) => {
         if (!isMounted) return;
         if (res) {
+          if (res.user) {
+            setUserProfile((prev: any) => ({ ...prev, ...res.user }));
+          }
           if (res.stats) {
             setStats(res.stats);
           } else if (res.totalDonations !== undefined) {
@@ -72,6 +84,45 @@ export const CitizenDashboard = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
+      {/* PERSONALIZED USER GREETING & HEALTH GRID TELEMETRY */}
+      {userProfile && (
+        <div className="bg-[#111827] border border-white/10 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-red to-brand-deep flex items-center justify-center font-black text-xl text-white shadow-lg shadow-brand-red/30 shrink-0">
+              {userProfile.bloodGroup || 'O+'}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-black text-white">
+                  Welcome back, {userProfile.name ? userProfile.name.split(' ')[0] : 'Citizen'}!
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold">
+                  ✓ Verified Profile
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-400 flex items-center gap-2 mt-1">
+                <span>Blood Group: <strong className="text-white">{userProfile.bloodGroup || 'O+'}</strong></span>
+                <span>•</span>
+                <span>Location: <strong className="text-white">{userProfile.city ? `${userProfile.city}, ${userProfile.state || 'India'}` : 'Ranchi, Jharkhand'}</strong></span>
+                {userProfile.donorAvailable !== false && (
+                  <>
+                    <span>•</span>
+                    <span className="text-brand-bright font-bold">Active Emergency Donor</span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/citizen/profile"
+            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-all shrink-0 self-stretch sm:self-auto text-center"
+          >
+            Manage Health Profile
+          </Link>
+        </div>
+      )}
+
       {/* 1. I NEED BLOOD URGENTLY - PROMINENT EMERGENCY CARD */}
       <div className="bg-gradient-to-r from-brand-red to-red-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-brand-red/20 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Building2, 
@@ -14,15 +14,21 @@ import {
   EyeOff, 
   KeyRound,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { REGISTERED_HOSPITALS } from '../../data/mockData';
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
+import { hospitalApi } from '../../services/hospitalApi';
+import type { Hospital } from '../../types';
 
 export const HospitalAuth = () => {
   const { hospitalId } = useParams<{ hospitalId: string }>();
   const navigate = useNavigate();
 
-  const hospital = REGISTERED_HOSPITALS.find((h) => h.id === hospitalId);
+  const [hospital, setHospital] = useState<Hospital | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,7 +36,7 @@ export const HospitalAuth = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState(hospital ? hospital.email : '');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('Admin@2026');
 
   // Register form state
@@ -41,14 +47,70 @@ export const HospitalAuth = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [regError, setRegError] = useState<string | null>(null);
 
-  // Quick toast helper
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // INVALID HOSPITAL ID ERROR STATE (Requirement 11)
-  if (!hospital) {
+  useEffect(() => {
+    if (!hospitalId) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    setFetchError(null);
+
+    hospitalApi.getById(hospitalId)
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (res && res.id) {
+          setHospital(res);
+          setLoginEmail(res.email || '');
+        } else {
+          const mock = REGISTERED_HOSPITALS.find((h) => h.id === hospitalId);
+          if (mock) {
+            setHospital(mock);
+            setLoginEmail(mock.email || '');
+          } else {
+            setFetchError('Hospital facility not found');
+          }
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        const mock = REGISTERED_HOSPITALS.find((h) => h.id === hospitalId);
+        if (mock) {
+          setHospital(mock);
+          setLoginEmail(mock.email || '');
+        } else {
+          setFetchError(err.message || 'Failed to connect to backend service');
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hospitalId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
+        <div className="bg-[#111827] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
+          <Loader2 className="w-10 h-10 text-brand-red animate-spin mx-auto" />
+          <h2 className="text-xl font-bold text-white">Loading Hospital Portal...</h2>
+          <p className="text-xs text-slate-400">Verifying hospital credentials with central registry...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // INVALID HOSPITAL ID ERROR STATE
+  if (fetchError || !hospital) {
     return (
       <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
         <div className="bg-[#111827] border border-red-500/30 rounded-3xl p-8 sm:p-10 max-w-lg w-full text-center space-y-6 shadow-2xl">
@@ -82,6 +144,17 @@ export const HospitalAuth = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    const staffSession = {
+      id: `hosp_admin_${Date.now()}`,
+      name: hospital.name + ' Administrator',
+      email: loginEmail,
+      hospitalId: hospital.id,
+      hospitalName: hospital.name,
+    };
+    localStorage.setItem('hemovite_hospital_staff', JSON.stringify(staffSession));
+    localStorage.setItem('hemovite_role', 'hospital_staff');
+    window.dispatchEvent(new Event('hemovite_auth_changed'));
+
     triggerToast(`Authenticated as Administrator for ${hospital.name}!`);
     setTimeout(() => {
       navigate(`/hospital/${hospital.id}/dashboard`);
@@ -95,6 +168,18 @@ export const HospitalAuth = () => {
       return;
     }
     setRegError(null);
+
+    const staffSession = {
+      id: `hosp_admin_${Date.now()}`,
+      name: adminName || hospital.name + ' Administrator',
+      email: adminEmail,
+      hospitalId: hospital.id,
+      hospitalName: hospital.name,
+    };
+    localStorage.setItem('hemovite_hospital_staff', JSON.stringify(staffSession));
+    localStorage.setItem('hemovite_role', 'hospital_staff');
+    window.dispatchEvent(new Event('hemovite_auth_changed'));
+
     triggerToast(`Registration submitted for ${hospital.name}! Redirecting to dashboard...`);
     setTimeout(() => {
       navigate(`/hospital/${hospital.id}/dashboard`);
@@ -102,7 +187,7 @@ export const HospitalAuth = () => {
   };
 
   const fillDemoCredentials = () => {
-    setLoginEmail(hospital.email);
+    setLoginEmail(hospital.email || 'admin@hospital.org');
     setLoginPassword('HemoVite@2026');
     triggerToast('Demo administrator credentials filled in!');
   };
@@ -181,7 +266,7 @@ export const HospitalAuth = () => {
             <button
               type="button"
               onClick={() => setActiveTab('login')}
-              className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === 'login'
                   ? 'bg-brand-red text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -192,7 +277,7 @@ export const HospitalAuth = () => {
             <button
               type="button"
               onClick={() => setActiveTab('register')}
-              className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === 'register'
                   ? 'bg-brand-red text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -213,7 +298,7 @@ export const HospitalAuth = () => {
                   <button
                     type="button"
                     onClick={fillDemoCredentials}
-                    className="text-[11px] text-blue-400 hover:text-blue-300 font-normal flex items-center gap-1"
+                    className="text-[11px] text-blue-400 hover:text-blue-300 font-normal flex items-center gap-1 cursor-pointer"
                   >
                     <Sparkles className="w-3 h-3" /> Fill Demo Admin
                   </button>
@@ -247,7 +332,7 @@ export const HospitalAuth = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200"
+                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -269,7 +354,7 @@ export const HospitalAuth = () => {
                 <button
                   type="button"
                   onClick={() => triggerToast(`Password reset link dispatched to ${loginEmail || hospital.email}`)}
-                  className="text-red-400 hover:text-red-300 font-medium"
+                  className="text-red-400 hover:text-red-300 font-medium cursor-pointer"
                 >
                   Forgot password?
                 </button>
@@ -278,7 +363,7 @@ export const HospitalAuth = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-red-950/50 hover:shadow-brand-red/40 transition-all flex items-center justify-center gap-2 group"
+                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-red-950/50 hover:shadow-brand-red/40 transition-all flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <span>Login to {hospital.name} Dashboard</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -412,7 +497,7 @@ export const HospitalAuth = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-red-950/50 hover:shadow-brand-red/40 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-red-950/50 hover:shadow-brand-red/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4" />
                 <span>Register Administrator Account</span>
@@ -420,6 +505,25 @@ export const HospitalAuth = () => {
 
             </form>
           )}
+
+          {/* GOOGLE AUTH DIVIDER & BUTTON */}
+          <div className="pt-2 space-y-4">
+            <div className="relative flex items-center">
+              <div className="flex-grow border-t border-white/10"></div>
+              <span className="flex-shrink-0 mx-4 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+                Or Staff Single Sign-On
+              </span>
+              <div className="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <GoogleSignInButton
+              role="hospital_staff"
+              facilityId={hospital.id}
+              returnUrl={`/hospital/${hospital.id}/dashboard`}
+              label="Continue with Google (Hospital Staff)"
+              variant="light"
+            />
+          </div>
 
         </div>
       </main>

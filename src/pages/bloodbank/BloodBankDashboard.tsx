@@ -6,7 +6,6 @@ import {
   HeartHandshake, 
   Inbox, 
   AlertTriangle, 
-  Clock, 
   ArrowRight, 
   Sparkles, 
   Plus, 
@@ -14,7 +13,9 @@ import {
   Activity, 
   AlertCircle,
   Phone,
-  Loader2
+  Loader2,
+  Building2,
+  Lock
 } from 'lucide-react';
 import { BloodBankNav } from '../../components/bloodbank/BloodBankNav';
 import { getBloodGroupStatus } from '../../components/bloodbank/BloodAvailabilityBadge';
@@ -23,6 +24,9 @@ import { RecordDonationModal } from '../../components/bloodbank/RecordDonationMo
 import { FindMatchingBloodModal } from '../../components/bloodbank/FindMatchingBloodModal';
 import { bloodBankApi } from '../../services/bloodBankApi';
 import { donationApi } from '../../services/donationApi';
+import { authApi } from '../../services/authApi';
+import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
+import { ExpiryWasteSection } from '../../components/inventory/ExpiryWasteSection';
 import type { BloodBank } from '../../types';
 
 export const BloodBankDashboard = () => {
@@ -31,6 +35,7 @@ export const BloodBankDashboard = () => {
   const [bloodBank, setBloodBank] = useState<BloodBank | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUnlinked, setIsUnlinked] = useState(false);
 
   // Local state for live interactions
   const [stockState, setStockState] = useState<Record<string, number>>({
@@ -38,7 +43,6 @@ export const BloodBankDashboard = () => {
   });
   const [recentDonations, setRecentDonations] = useState<any[]>([]);
   const [emergencyRequests, setEmergencyRequests] = useState<any[]>([]);
-  const [expiryItems, setExpiryItems] = useState<any[]>([]);
   const [shortagePredictions, setShortagePredictions] = useState<any[]>([]);
 
   const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
@@ -47,27 +51,64 @@ export const BloodBankDashboard = () => {
   const [selectedMatchingGroup, setSelectedMatchingGroup] = useState('O-');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [expiryFilter, setExpiryFilter] = useState<'all' | '2days' | '7days' | '30days'>('all');
-
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3800);
   };
 
   useEffect(() => {
-    if (!bloodBankId) return;
-
     let isMounted = true;
     setLoading(true);
     setError(null);
+    setIsUnlinked(false);
 
-    bloodBankApi.getDashboard(bloodBankId)
-      .then((res: any) => {
+    const resolveAndLoad = async () => {
+      let targetId = bloodBankId;
+
+      // If no ID or generic, resolve via backend auth state
+      if (!targetId || targetId === 'me') {
+        try {
+          const me = await authApi.getMe();
+          if (me?.facility && me.facility.type === 'blood_bank') {
+            targetId = me.facility.id;
+          } else if (me?.user?.role === 'blood_bank_staff' || me?.user?.role === 'blood_bank') {
+            if (!me.facility) {
+              if (isMounted) {
+                setIsUnlinked(true);
+                setLoading(false);
+              }
+              return;
+            }
+          }
+        } catch {
+          const savedStaff = localStorage.getItem('hemovite_bloodbank_staff');
+          if (savedStaff) {
+            try {
+              const parsed = JSON.parse(savedStaff);
+              if (parsed.bloodBankId) targetId = parsed.bloodBankId;
+            } catch {}
+          }
+        }
+      }
+
+      if (!targetId) {
+        if (isMounted) {
+          setIsUnlinked(true);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const res: any = await bloodBankApi.getDashboard(targetId);
         if (!isMounted) return;
         if (res && res.bloodBank) {
           setBloodBank(res.bloodBank);
           if (res.inventory) {
             setStockState(res.inventory);
+          }
+          if (res.donations) {
+            setRecentDonations(res.donations);
           }
           if (res.recentDonations) {
             setRecentDonations(res.recentDonations);
@@ -75,23 +116,41 @@ export const BloodBankDashboard = () => {
           if (res.emergencyRequests) {
             setEmergencyRequests(res.emergencyRequests);
           }
-          if (res.expiryAlerts) {
-            setExpiryItems(res.expiryAlerts);
-          }
           if (res.shortagePredictions) {
             setShortagePredictions(res.shortagePredictions);
           }
         } else {
-          setError('Blood bank not found in database');
+          // Fallback to getById
+          const bb = await bloodBankApi.getById(targetId);
+          if (!isMounted) return;
+          if (bb && bb.id) {
+            setBloodBank(bb);
+            if (bb.inventory) setStockState(bb.inventory);
+          } else {
+            const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === targetId || b.registrationNumber === targetId);
+            if (mock) {
+              setBloodBank(mock);
+              if (mock.inventory) setStockState(mock.inventory);
+            } else {
+              setError(`Blood bank facility identifier "${targetId}" does not exist in the database.`);
+            }
+          }
         }
-      })
-      .catch((err) => {
+      } catch (err: any) {
         if (!isMounted) return;
-        setError(err.message || 'Failed to connect to backend service');
-      })
-      .finally(() => {
+        const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === targetId || b.registrationNumber === targetId);
+        if (mock) {
+          setBloodBank(mock);
+          if (mock.inventory) setStockState(mock.inventory);
+        } else {
+          setError(err.message || 'Failed to connect to backend service');
+        }
+      } finally {
         if (isMounted) setLoading(false);
-      });
+      }
+    };
+
+    resolveAndLoad();
 
     return () => {
       isMounted = false;
@@ -167,6 +226,43 @@ export const BloodBankDashboard = () => {
     );
   }
 
+  // UNLINKED FACILITY STATE (Logged in as Blood Bank Staff but no facility attached)
+  if (isUnlinked) {
+    return (
+      <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
+        <div className="bg-[#111827] border border-amber-500/30 rounded-3xl p-8 max-w-lg w-full text-center space-y-6 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-950/80 border border-amber-500/50 text-amber-400 flex items-center justify-center mx-auto">
+            <Building2 className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-white">Facility Link Required</h2>
+            <p className="text-sm text-slate-300">
+              Your account is authenticated, but not yet linked to an authorized blood bank facility.
+            </p>
+            <p className="text-xs text-slate-400">
+              Please select your registered blood bank from the directory or complete facility verification.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link
+              to="/blood-bank/login"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all"
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Select Registered Blood Bank</span>
+            </Link>
+            <Link
+              to="/blood-banks"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 border border-white/10 text-white font-bold text-xs rounded-xl hover:bg-slate-700 transition-all"
+            >
+              <span>Browse Facilities Directory</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // INVALID BLOOD BANK ERROR STATE
   if (error || !bloodBank) {
     return (
@@ -182,12 +278,20 @@ export const BloodBankDashboard = () => {
             </p>
             {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
-          <Link
-            to="/blood-banks"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all"
-          >
-            <span>Return to Registered Blood Banks</span>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link
+              to="/blood-banks"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all"
+            >
+              <span>Return to Registered Blood Banks</span>
+            </Link>
+            <Link
+              to="/blood-bank/login"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 border border-white/10 text-white font-bold text-xs rounded-xl hover:bg-slate-700 transition-all"
+            >
+              <span>Staff Login</span>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -196,12 +300,6 @@ export const BloodBankDashboard = () => {
   const totalStockUnits = Object.values(stockState).reduce((acc, curr) => acc + curr, 0);
   const criticalGroups = Object.keys(stockState).filter((g) => (stockState[g] ?? 0) <= 5);
   const bloodGroups = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
-
-  const filteredExpiry = expiryItems.filter((item) => {
-    if (expiryFilter === '2days') return (item.daysRemaining ?? 3) <= 2;
-    if (expiryFilter === '7days') return (item.daysRemaining ?? 7) <= 7;
-    return true;
-  });
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-white flex flex-col selection:bg-brand-red selection:text-white relative pb-16">
@@ -485,79 +583,23 @@ export const BloodBankDashboard = () => {
 
         </div>
 
-        {/* 4. EXPIRY ALERTS & LOW STOCK INTELLIGENCE */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* EXPIRY ALERTS */}
-          <div className="bg-[#111827] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-400" />
-                <h4 className="text-base font-black text-white">⚠️ Blood Expiry Tracking</h4>
-              </div>
+        {/* 4. EXPIRY & WASTE MANAGEMENT INTEGRATED SECTION */}
+        <div className="pt-2">
+          <ExpiryWasteSection
+            role={bloodBank.ngoPartner ? 'ngo' : 'blood_bank'}
+            bloodBankId={bloodBank.id}
+            title={bloodBank.ngoPartner ? 'NGO Expiry & Waste Coordination' : 'Expiry & Waste Management'}
+            subtitle={`Cold-chain shelf-life tracking and regulatory discard ledger for ${bloodBank.name}`}
+            onRefreshParent={() => {
+              bloodBankApi.getDashboard(bloodBank.id).then((res: any) => {
+                if (res?.inventory) setStockState(res.inventory);
+              });
+            }}
+          />
+        </div>
 
-              {/* Expiry Filter Pills */}
-              <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-[10px] font-bold">
-                {[
-                  { id: 'all', label: 'All' },
-                  { id: '2days', label: '2 Days' },
-                  { id: '7days', label: '7 Days' },
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setExpiryFilter(f.id as any)}
-                    className={`px-2 py-1 rounded-lg transition-all ${
-                      expiryFilter === f.id ? 'bg-brand-red text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              {filteredExpiry.length > 0 ? (
-                filteredExpiry.map((item, idx) => (
-                  <div
-                    key={item.id || idx}
-                    className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-red-950 border border-red-500/40 text-brand-bright font-black flex items-center justify-center">
-                          {item.bloodGroup}
-                        </span>
-                        <span className="font-bold text-white font-mono">{item.units} Units</span>
-                        <span className="text-[10px] font-mono text-slate-400">({item.batchNumber || item.batchId || 'BATCH'})</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400">{item.component || 'Whole Blood'}</p>
-                    </div>
-
-                    <div className="text-right space-y-1">
-                      <span className="px-2.5 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-500/40 font-bold text-[10px]">
-                        {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'Expires Soon'}
-                      </span>
-                      <button
-                        onClick={() => {
-                          triggerToast(`Priority rotation notice dispatched for batch ${item.batchNumber || item.id}`);
-                        }}
-                        className="text-[10px] text-blue-400 hover:underline block font-semibold cursor-pointer"
-                      >
-                        Prioritize Issue
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-4 text-center text-xs text-slate-400">
-                  No batches expiring within the selected timeframe.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* INTELLIGENT SHORTAGE WARNINGS & ACTIONS */}
+        {/* 5. INTELLIGENT SHORTAGE ACTIONS */}
+        <div className="grid grid-cols-1 gap-6">
           <div className="bg-[#111827] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">

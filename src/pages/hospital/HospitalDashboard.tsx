@@ -18,22 +18,23 @@ import {
     Calendar,
     Clock,
     Search,
-    Check
+    Check,
+    Loader2
 } from 'lucide-react';
 import { REGISTERED_HOSPITALS } from '../../data/mockData';
 import { getHospitalDonorPledges, updatePledgeStatus } from '../../utils/hospitalDonorPledgeStore';
-import type { HospitalDonorPledge } from '../../types';
+import type { HospitalDonorPledge, Hospital } from '../../types';
 import { hospitalApi } from '../../services/hospitalApi';
+import { authApi } from '../../services/authApi';
 
 export const HospitalDashboard = () => {
     const { hospitalId } = useParams<{ hospitalId: string }>();
     const navigate = useNavigate();
 
-    const [hospitalData, setHospitalData] = useState<any>(null);
-    const [, setLoading] = useState(true);
-
-    const mockHospital = REGISTERED_HOSPITALS.find((h) => h.id === hospitalId);
-    const hospital = hospitalData || mockHospital;
+    const [hospital, setHospital] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isUnlinked, setIsUnlinked] = useState(false);
 
     // Local state for interactive features
     const [stockState, setStockState] = useState<Record<string, number>>({
@@ -53,29 +54,99 @@ export const HospitalDashboard = () => {
     const [pledges, setPledges] = useState<HospitalDonorPledge[]>([]);
 
     useEffect(() => {
-        const fetchDashboardData = async () => {
-            if (!hospitalId) return;
+        let isMounted = true;
+        setLoading(true);
+        setError(null);
+        setIsUnlinked(false);
+
+        const resolveAndLoad = async () => {
+            let targetId = hospitalId;
+
+            // If no ID or generic, resolve via backend auth state
+            if (!targetId || targetId === 'me') {
+                try {
+                    const me = await authApi.getMe();
+                    if (me?.facility && me.facility.type === 'hospital') {
+                        targetId = me.facility.id;
+                    } else if (me?.user?.role === 'hospital_staff' || me?.user?.role === 'hospital') {
+                        if (!me.facility) {
+                            if (isMounted) {
+                                setIsUnlinked(true);
+                                setLoading(false);
+                            }
+                            return;
+                        }
+                    }
+                } catch {
+                    const savedStaff = localStorage.getItem('hemovite_hospital_staff');
+                    if (savedStaff) {
+                        try {
+                            const parsed = JSON.parse(savedStaff);
+                            if (parsed.hospitalId) targetId = parsed.hospitalId;
+                        } catch {}
+                    }
+                }
+            }
+
+            if (!targetId) {
+                if (isMounted) {
+                    setIsUnlinked(true);
+                    setLoading(false);
+                }
+                return;
+            }
+
             try {
-                setLoading(true);
-                const res: any = await hospitalApi.getDashboard(hospitalId);
+                const res: any = await hospitalApi.getDashboard(targetId);
+                if (!isMounted) return;
                 if (res?.hospital) {
-                    setHospitalData({
+                    setHospital({
                         ...res.hospital,
-                        stock: res.stock || mockHospital?.stock || stockState,
-                        bloodBankLinked: mockHospital?.bloodBankLinked || 'Ranchi Central Blood Bank'
+                        stock: res.stock || stockState,
+                        bloodBankLinked: res.hospital?.bloodBankLinked || 'Ranchi Central Blood Bank'
                     });
                     if (res.stock) {
                         setStockState(res.stock);
                     }
+                } else {
+                    const hosp = await hospitalApi.getById(targetId);
+                    if (!isMounted) return;
+                    if (hosp && hosp.id) {
+                        setHospital({
+                            ...hosp,
+                            stock: hosp.stock || stockState,
+                            bloodBankLinked: hosp.bloodBankLinked || 'Ranchi Central Blood Bank'
+                        });
+                        if (hosp.stock) setStockState(hosp.stock);
+                    } else {
+                        const mock = REGISTERED_HOSPITALS.find((h) => h.id === targetId || h.registrationNumber === targetId);
+                        if (mock) {
+                            setHospital(mock);
+                            if (mock.stock) setStockState(mock.stock);
+                        } else {
+                            setError(`Hospital facility identifier "${targetId}" does not exist in the database.`);
+                        }
+                    }
                 }
-            } catch (err) {
-                console.error('Failed to fetch hospital dashboard data:', err);
+            } catch (err: any) {
+                if (!isMounted) return;
+                const mock = REGISTERED_HOSPITALS.find((h) => h.id === targetId || h.registrationNumber === targetId);
+                if (mock) {
+                    setHospital(mock);
+                    if (mock.stock) setStockState(mock.stock);
+                } else {
+                    setError(err.message || 'Failed to connect to backend service');
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
-        fetchDashboardData();
+        resolveAndLoad();
+
+        return () => {
+            isMounted = false;
+        };
     }, [hospitalId]);
 
     useEffect(() => {
@@ -151,8 +222,57 @@ export const HospitalDashboard = () => {
         setTimeout(() => setToastMessage(null), 3800);
     };
 
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
+                <div className="bg-[#111827] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
+                    <Loader2 className="w-10 h-10 text-brand-red animate-spin mx-auto" />
+                    <h2 className="text-xl font-bold text-white">Loading Hospital Telemetry...</h2>
+                    <p className="text-xs text-slate-400">Connecting to PostgreSQL central hospital reserve database...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // UNLINKED FACILITY STATE
+    if (isUnlinked) {
+        return (
+            <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
+                <div className="bg-[#111827] border border-amber-500/30 rounded-3xl p-8 max-w-lg w-full text-center space-y-6 shadow-2xl">
+                    <div className="w-16 h-16 rounded-2xl bg-amber-950/80 border border-amber-500/50 text-amber-400 flex items-center justify-center mx-auto">
+                        <Building2 className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-2">
+                        <h2 className="text-2xl font-black text-white">Facility Link Required</h2>
+                        <p className="text-sm text-slate-300">
+                            Your account is authenticated, but not yet linked to an authorized hospital facility.
+                        </p>
+                        <p className="text-xs text-slate-400">
+                            Please select your registered hospital from the directory or complete facility verification.
+                        </p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                        <Link
+                            to="/hospital/login"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all"
+                        >
+                            <Building2 className="w-4 h-4" />
+                            <span>Select Registered Hospital</span>
+                        </Link>
+                        <Link
+                            to="/hospitals"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 border border-white/10 text-white font-bold text-xs rounded-xl hover:bg-slate-700 transition-all"
+                        >
+                            <span>Browse Hospitals Directory</span>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     // INVALID HOSPITAL ID ERROR STATE
-    if (!hospital) {
+    if (error || !hospital) {
         return (
             <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
                 <div className="bg-[#111827] border border-red-500/30 rounded-3xl p-8 max-w-lg w-full text-center space-y-6 shadow-2xl">
@@ -162,16 +282,25 @@ export const HospitalDashboard = () => {
                     <div className="space-y-2">
                         <h2 className="text-2xl font-black text-white">Hospital Not Found</h2>
                         <p className="text-sm text-slate-400">
-                            Invalid hospital ID <strong className="text-red-400 font-mono">"{hospitalId}"</strong>.
+                            Identifier <strong className="text-red-400 font-mono">"{hospitalId}"</strong> does not exist in the database.
                         </p>
+                        {error && <p className="text-xs text-red-400">{error}</p>}
                     </div>
-                    <Link
-                        to="/hospitals"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span>Return to Registered Hospitals</span>
-                    </Link>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                        <Link
+                            to="/hospitals"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-brand-red text-white font-bold text-xs rounded-xl shadow hover:bg-red-700 transition-all"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                            <span>Return to Registered Hospitals</span>
+                        </Link>
+                        <Link
+                            to="/hospital/login"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 border border-white/10 text-white font-bold text-xs rounded-xl hover:bg-slate-700 transition-all"
+                        >
+                            <span>Staff Login</span>
+                        </Link>
+                    </div>
                 </div>
             </div>
         );

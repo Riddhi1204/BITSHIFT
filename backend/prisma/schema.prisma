@@ -69,6 +69,7 @@ model User {
   donatedBatches         InventoryBatch[]              @relation("DonorBatches")
   approvedTransfers      InventoryTransfer[]           @relation("ApprovedTransfers")
   requestedTransfers     InventoryTransfer[]           @relation("RequestedTransfers")
+  wasteRecords           WasteRecord[]                 @relation("RecordedWaste")
   notifications          Notification[]
   region                 Region?                       @relation(fields: [regionId], references: [id], onUpdate: NoAction)
 
@@ -147,6 +148,7 @@ model Hospital {
   verifier               User?                         @relation("VerifiedHospitals", fields: [verifiedBy], references: [id], onUpdate: NoAction)
   transfersAsDestination InventoryTransfer[]           @relation("DestinationHospitalTransfers")
   transfersAsSource      InventoryTransfer[]           @relation("SourceHospitalTransfers")
+  wasteRecords           WasteRecord[]
   shortagePredictions    ShortagePrediction[]
 
   @@index([regionId], map: "idx_hospitals_region")
@@ -200,6 +202,7 @@ model BloodBank {
   donations              Donation[]
   transfersAsDestination InventoryTransfer[]  @relation("DestinationBloodBankTransfers")
   transfersAsSource      InventoryTransfer[]  @relation("SourceBloodBankTransfers")
+  wasteRecords           WasteRecord[]
   shortagePredictions    ShortagePrediction[]
 
   @@map("blood_banks")
@@ -219,6 +222,7 @@ model BloodInventory {
   bloodBank            BloodBank?       @relation(fields: [bloodBankId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   hospital             Hospital?        @relation(fields: [hospitalId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   batches              InventoryBatch[]
+  wasteRecords         WasteRecord[]
 
   @@index([bloodGroup], map: "idx_inventory_group")
   @@index([hospitalId], map: "idx_inventory_hospital")
@@ -242,6 +246,7 @@ model InventoryBatch {
   donor          User?               @relation("DonorBatches", fields: [donorId], references: [id], onUpdate: NoAction)
   inventory      BloodInventory      @relation(fields: [inventoryId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   transfers      InventoryTransfer[]
+  wasteRecords   WasteRecord[]
 
   @@index([expiryDate], map: "idx_batches_expiry")
   @@index([status], map: "idx_batches_status")
@@ -506,4 +511,32 @@ model AuditLog {
   @@index([action], map: "idx_audit_action")
   @@index([createdAt(sort: Desc)], map: "idx_audit_created")
   @@map("audit_logs")
+}
+
+model WasteRecord {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId      String?         @map("batch_id") @db.Uuid
+  inventoryId  String?         @map("inventory_id") @db.Uuid
+  bloodBankId  String?         @map("blood_bank_id") @db.Uuid
+  hospitalId   String?         @map("hospital_id") @db.Uuid
+  bloodGroup   String          @map("blood_group") @db.VarChar(5)
+  component    String          @default("whole_blood") @db.VarChar(50)
+  units        Int
+  reason       String          @db.VarChar(100)
+  notes        String?
+  wastedAt     DateTime?       @default(now()) @map("wasted_at") @db.Timestamptz(6)
+  recordedById String?         @map("recorded_by_id") @db.Uuid
+  createdAt    DateTime?       @default(now()) @map("created_at") @db.Timestamptz(6)
+  batch        InventoryBatch? @relation(fields: [batchId], references: [id], onUpdate: NoAction)
+  inventory    BloodInventory? @relation(fields: [inventoryId], references: [id], onUpdate: NoAction)
+  bloodBank    BloodBank?      @relation(fields: [bloodBankId], references: [id], onUpdate: NoAction)
+  hospital     Hospital?       @relation(fields: [hospitalId], references: [id], onUpdate: NoAction)
+  recordedBy   User?           @relation("RecordedWaste", fields: [recordedById], references: [id], onUpdate: NoAction)
+
+  @@index([bloodBankId], map: "idx_waste_blood_bank")
+  @@index([hospitalId], map: "idx_waste_hospital")
+  @@index([bloodGroup], map: "idx_waste_blood_group")
+  @@index([reason], map: "idx_waste_reason")
+  @@index([wastedAt(sort: Desc)], map: "idx_waste_wasted_at")
+  @@map("waste_records")
 }

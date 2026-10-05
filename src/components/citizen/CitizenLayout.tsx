@@ -188,14 +188,22 @@ export const CitizenLayout = () => {
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-brand-red rounded-full border-2 border-[#111827]"></span>
             </NavLink>
             <NavLink to="/citizen/profile" className="flex items-center gap-3 pl-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 p-[2px]">
-                <div className="w-full h-full bg-[#111827] rounded-[10px] overflow-hidden flex items-center justify-center font-bold text-blue-400">
-                  {citizenUser ? citizenUser.avatarInitials : <User className="w-5 h-5 text-blue-400" />}
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-red to-brand-deep p-[2px]">
+                <div className="w-full h-full bg-[#111827] rounded-[10px] overflow-hidden flex items-center justify-center font-bold text-white">
+                  {citizenUser?.avatarUrl ? (
+                    <img src={citizenUser.avatarUrl} alt={citizenUser.name} className="w-full h-full object-cover" />
+                  ) : citizenUser ? (
+                    citizenUser.avatarInitials
+                  ) : (
+                    <User className="w-5 h-5 text-slate-400" />
+                  )}
                 </div>
               </div>
               <div className="hidden xl:block">
                 <div className="text-sm font-bold text-white">{citizenUser ? citizenUser.name : 'Citizen User'}</div>
-                <div className="text-[11px] font-medium text-emerald-400">O+ Eligible</div>
+                <div className="text-[11px] font-medium text-emerald-400">
+                  {citizenUser?.bloodGroup ? `${citizenUser.bloodGroup} Eligible` : 'Citizen'}
+                </div>
               </div>
             </NavLink>
           </div>

@@ -16,7 +16,8 @@ import {
   Award,
   Bell,
   Settings,
-  LogOut
+  LogOut,
+  MapPin
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -152,63 +153,133 @@ export const Navbar = ({ onSelectRole, onOpenEmergency, onOpenFinder }: NavbarPr
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all duration-200 hover:bg-white/5 border border-transparent hover:border-white/10"
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl transition-all duration-200 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 shadow-sm"
+                  aria-expanded={dropdownOpen}
+                  aria-haspopup="true"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-red to-brand-deep text-white flex items-center justify-center text-xs font-bold shadow-md">
-                    {citizenUser.avatarInitials}
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-red to-brand-deep text-white flex items-center justify-center text-xs font-black shadow-md shrink-0">
+                    {citizenUser.avatarUrl ? (
+                      <img src={citizenUser.avatarUrl} alt={citizenUser.name} className="w-full h-full rounded-lg object-cover" />
+                    ) : (
+                      citizenUser.avatarInitials
+                    )}
                   </div>
-                  <span className="text-sm font-semibold text-white hidden lg:block">{citizenUser.name.split(' ')[0]}</span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                  <div className="text-left hidden lg:block min-w-0 max-w-[120px]">
+                    <span className="text-xs font-bold text-white block leading-tight truncate">{citizenUser.name}</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      {citizenUser.bloodGroup ? `${citizenUser.bloodGroup} Donor` : 'Citizen'}
+                    </span>
+                  </div>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
+                {/* PROFILE DROPDOWN MENU */}
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-2xl border border-slate-100 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-slate-800">
-                    <div className="px-3 py-2 border-b border-slate-100 mb-2">
-                      <p className="text-sm font-bold truncate">{citizenUser.name}</p>
-                      <p className="text-[11px] font-semibold text-emerald-600">Citizen Profile</p>
+                  <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-[#111827] shadow-2xl border border-white/10 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-white">
+                    {/* PROFILE HEADER CARD */}
+                    <div className="p-3 bg-[#0B1220] rounded-xl border border-white/5 mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-red to-brand-deep text-white flex items-center justify-center text-sm font-black shadow-md shrink-0">
+                          {citizenUser.avatarUrl ? (
+                            <img src={citizenUser.avatarUrl} alt={citizenUser.name} className="w-full h-full rounded-xl object-cover" />
+                          ) : (
+                            citizenUser.avatarInitials
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-white truncate">{citizenUser.name}</p>
+                          <p className="text-xs text-slate-400 truncate">{citizenUser.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1.5 text-slate-300">
+                          <Droplet className="w-3.5 h-3.5 text-red-400" />
+                          <span className="font-semibold">{citizenUser.bloodGroup ? `Group ${citizenUser.bloodGroup}` : 'Profile incomplete'}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-slate-400">
+                          <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="truncate max-w-[100px]">{citizenUser.city ? `${citizenUser.city}${citizenUser.state ? ', ' + citizenUser.state : ''}` : 'Location unset'}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-2 mb-1">Profile</p>
-                      <Link to="/citizen/profile" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                        <User className="w-4 h-4 text-slate-400" /> My Profile
+                    {/* MENU ITEMS */}
+                    <div className="space-y-0.5">
+                      <Link 
+                        to="/citizen/profile" 
+                        onClick={() => setDropdownOpen(false)} 
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <User className="w-4 h-4 text-slate-400" />
+                        <span>My Profile</span>
                       </Link>
 
-                      <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">Blood Services</p>
-                      <Link to="/citizen/find-blood" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                        <Search className="w-4 h-4 text-slate-400" /> Find Blood
-                      </Link>
-                      <Link to="/citizen/request-blood" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
-                        <AlertTriangle className="w-4 h-4" /> Request Blood
-                      </Link>
-                      <Link to="/citizen/hospitals" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                        <Building2 className="w-4 h-4 text-slate-400" /> Nearby Hospitals
+                      <Link 
+                        to="/citizen/donations" 
+                        onClick={() => setDropdownOpen(false)} 
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <History className="w-4 h-4 text-slate-400" />
+                        <span>Donation History</span>
                       </Link>
 
-                      <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">My Activity</p>
-                      <Link to="/citizen/donations" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                        <History className="w-4 h-4 text-slate-400" /> Donation History
-                      </Link>
-                      <Link to="/citizen/badges" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                        <Award className="w-4 h-4 text-slate-400" /> My Badges
-                      </Link>
-                      <Link to="/citizen/notifications" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                        <Bell className="w-4 h-4 text-slate-400" /> Notifications
+                      <Link 
+                        to="/citizen/badges" 
+                        onClick={() => setDropdownOpen(false)} 
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <Award className="w-4 h-4 text-slate-400" />
+                        <span>My Badges</span>
                       </Link>
 
-                      <div className="border-t border-slate-100 my-2 pt-1"></div>
-                      <Link to="/citizen/settings" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                        <Settings className="w-4 h-4 text-slate-400" /> Settings
+                      <button 
+                        onClick={() => { setDropdownOpen(false); onOpenEmergency(); }} 
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/30 transition-colors text-left"
+                      >
+                        <AlertTriangle className="w-4 h-4 text-brand-red" />
+                        <span>Request Blood</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { setDropdownOpen(false); onOpenFinder(); }} 
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-colors text-left"
+                      >
+                        <Search className="w-4 h-4 text-slate-400" />
+                        <span>Find Blood</span>
+                      </button>
+
+                      <Link 
+                        to="/citizen/dashboard" 
+                        onClick={() => setDropdownOpen(false)} 
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <Activity className="w-4 h-4 text-slate-400" />
+                        <span>My Activity</span>
                       </Link>
+
+                      <div className="border-t border-white/5 my-1.5 pt-1"></div>
+
+                      <Link 
+                        to="/citizen/settings" 
+                        onClick={() => setDropdownOpen(false)} 
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <Settings className="w-4 h-4 text-slate-400" />
+                        <span>Account Settings</span>
+                      </Link>
+
                       <button 
                         onClick={() => {
                           logoutCitizen();
                           setDropdownOpen(false);
                           navigate('/');
                         }} 
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/30 transition-colors text-left"
                       >
-                        <LogOut className="w-4 h-4" /> Logout
+                        <LogOut className="w-4 h-4 text-red-400" />
+                        <span>Logout</span>
                       </button>
                     </div>
                   </div>
@@ -358,78 +429,108 @@ export const Navbar = ({ onSelectRole, onOpenEmergency, onOpenFinder }: NavbarPr
 
           <div>
             {citizenUser ? (
-              <>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
                   Citizen Account
                 </p>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-red to-brand-deep text-white flex items-center justify-center font-bold">
-                      {citizenUser.avatarInitials}
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">{citizenUser.name}</div>
-                      <div className="text-[11px] text-emerald-400">Citizen Profile</div>
+                <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-red to-brand-deep text-white flex items-center justify-center font-bold">
+                    {citizenUser.avatarUrl ? (
+                      <img src={citizenUser.avatarUrl} alt={citizenUser.name} className="w-full h-full rounded-lg object-cover" />
+                    ) : (
+                      citizenUser.avatarInitials
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">{citizenUser.name}</div>
+                    <div className="text-[11px] text-emerald-400 flex items-center gap-1">
+                      <span>{citizenUser.bloodGroup ? `Group ${citizenUser.bloodGroup}` : citizenUser.email}</span>
                     </div>
                   </div>
-                  
-                  <button 
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      navigate('/citizen/dashboard');
-                    }}
-                    className="w-full text-left text-sm font-medium text-slate-200 hover:text-white py-2 flex items-center gap-2"
-                  >
-                    <User className="w-4 h-4 text-slate-400" /> My Profile
-                  </button>
-                  <button 
-                    onClick={() => {
-                      logoutCitizen();
-                      setMobileMenuOpen(false);
-                      navigate('/');
-                    }}
-                    className="w-full text-left text-sm font-medium text-red-400 hover:text-red-300 py-2 flex items-center gap-2"
-                  >
-                    <LogOut className="w-4 h-4" /> Logout
-                  </button>
                 </div>
-              </>
+                
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Link 
+                    to="/citizen/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 p-2.5 bg-white/5 rounded-lg text-white text-xs font-semibold"
+                  >
+                    <User className="w-4 h-4 text-slate-400" />
+                    <span>Profile</span>
+                  </Link>
+                  <Link 
+                    to="/citizen/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 p-2.5 bg-white/5 rounded-lg text-white text-xs font-semibold"
+                  >
+                    <Activity className="w-4 h-4 text-slate-400" />
+                    <span>Dashboard</span>
+                  </Link>
+                  <Link 
+                    to="/citizen/donations"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 p-2.5 bg-white/5 rounded-lg text-white text-xs font-semibold"
+                  >
+                    <History className="w-4 h-4 text-slate-400" />
+                    <span>Donations</span>
+                  </Link>
+                  <Link 
+                    to="/citizen/badges"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 p-2.5 bg-white/5 rounded-lg text-white text-xs font-semibold"
+                  >
+                    <Award className="w-4 h-4 text-slate-400" />
+                    <span>Badges</span>
+                  </Link>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    logoutCitizen();
+                    setMobileMenuOpen(false);
+                    navigate('/');
+                  }}
+                  className="w-full text-left text-xs font-bold text-red-400 hover:text-red-300 py-2.5 px-3 bg-red-950/30 rounded-lg flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" /> Logout from Session
+                </button>
+              </div>
             ) : (
               <>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
                   Login or Register By Role
                 </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => handleRoleClick('hospital')}
-                className="flex items-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-semibold"
-              >
-                <Building2 className="w-4 h-4 text-red-400" />
-                <span>Hospital</span>
-              </button>
-              <button
-                onClick={() => handleRoleClick('blood_bank')}
-                className="flex items-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-semibold"
-              >
-                <Droplet className="w-4 h-4 text-red-400" />
-                <span>Blood Bank</span>
-              </button>
-              <button
-                onClick={() => handleRoleClick('government')}
-                className="flex items-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-semibold"
-              >
-                <Landmark className="w-4 h-4 text-blue-400" />
-                <span>Government</span>
-              </button>
-              <button
-                onClick={() => handleRoleClick('citizen')}
-                className="flex items-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-semibold"
-              >
-                <User className="w-4 h-4 text-emerald-400" />
-                <span>Citizen</span>
-              </button>
-            </div>
-            </>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleRoleClick('hospital')}
+                    className="flex items-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-semibold"
+                  >
+                    <Building2 className="w-4 h-4 text-red-400" />
+                    <span>Hospital</span>
+                  </button>
+                  <button
+                    onClick={() => handleRoleClick('blood_bank')}
+                    className="flex items-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-semibold"
+                  >
+                    <Droplet className="w-4 h-4 text-red-400" />
+                    <span>Blood Bank</span>
+                  </button>
+                  <button
+                    onClick={() => handleRoleClick('government')}
+                    className="flex items-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-semibold"
+                  >
+                    <Landmark className="w-4 h-4 text-blue-400" />
+                    <span>Government</span>
+                  </button>
+                  <button
+                    onClick={() => handleRoleClick('citizen')}
+                    className="flex items-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-xs font-semibold"
+                  >
+                    <User className="w-4 h-4 text-emerald-400" />
+                    <span>Citizen</span>
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

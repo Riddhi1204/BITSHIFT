@@ -1,20 +1,48 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   HeartHandshake, 
   Plus, 
   Search, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Loader2 
 } from 'lucide-react';
 import { REGISTERED_BLOOD_BANKS, MOCK_DONATIONS } from '../../data/mockData';
 import { BloodBankNav } from '../../components/bloodbank/BloodBankNav';
-import type { BloodDonation } from '../../types';
+import type { BloodDonation, BloodBank } from '../../types';
 import { RecordDonationModal } from '../../components/bloodbank/RecordDonationModal';
+import { bloodBankApi } from '../../services/bloodBankApi';
 
 export const BloodBankDonations = () => {
   const { bloodBankId } = useParams<{ bloodBankId: string }>();
-  const bloodBank = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId);
+  const [bloodBank, setBloodBank] = useState<BloodBank | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBank = async () => {
+      if (!bloodBankId) return;
+      try {
+        setLoading(true);
+        const data = await bloodBankApi.getById(bloodBankId);
+        if (!isMounted) return;
+        if (data && data.id) {
+          setBloodBank(data);
+        } else {
+          const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId || b.registrationNumber === bloodBankId);
+          if (mock) setBloodBank(mock);
+        }
+      } catch (err) {
+        const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId || b.registrationNumber === bloodBankId);
+        if (mock && isMounted) setBloodBank(mock);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchBank();
+    return () => { isMounted = false; };
+  }, [bloodBankId]);
 
   const [donations, setDonations] = useState<BloodDonation[]>(MOCK_DONATIONS);
   const [modalOpen, setModalOpen] = useState(false);
@@ -27,12 +55,24 @@ export const BloodBankDonations = () => {
     setTimeout(() => setToastMessage(null), 3800);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
+        <div className="bg-[#111827] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
+          <Loader2 className="w-10 h-10 text-brand-red animate-spin mx-auto" />
+          <h2 className="text-xl font-bold text-white">Loading Donation Ledger...</h2>
+        </div>
+      </div>
+    );
+  }
+
   if (!bloodBank) {
     return (
       <div className="min-h-screen bg-[#0B1220] text-white flex flex-col items-center justify-center p-4">
         <div className="bg-[#111827] border border-red-500/30 rounded-3xl p-8 max-w-lg w-full text-center space-y-4">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
           <h2 className="text-2xl font-black text-white">Blood Bank Not Found</h2>
+          <p className="text-sm text-slate-400">Identifier <strong className="text-red-400 font-mono">"{bloodBankId}"</strong> does not exist.</p>
           <Link to="/blood-banks" className="inline-block px-5 py-2.5 bg-brand-red text-white font-bold text-xs rounded-xl">
             View Registered Blood Banks
           </Link>

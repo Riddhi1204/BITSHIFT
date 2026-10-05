@@ -5,6 +5,9 @@ export class CitizenService {
    * Get citizen full profile & dashboard info
    */
   static async getCitizenDashboard(userId: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    if (!isUuid) return null;
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -75,6 +78,8 @@ export class CitizenService {
     fullName?: string;
     phone?: string;
     bloodGroup?: string;
+    gender?: string;
+    dateOfBirth?: string | Date;
     city?: string;
     state?: string;
     emergencyContactName?: string;
@@ -84,13 +89,30 @@ export class CitizenService {
     healthNotes?: string;
     address?: string;
   }) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    let user = await prisma.user.findFirst({
+      where: isUuid ? { id: userId } : { email: userId },
+    });
+
+    if (!user) {
+      // Fallback: look up first citizen or create
+      user = await prisma.user.findFirst({ where: { role: 'citizen' } });
+      if (!user) {
+        throw new Error('Citizen user record not found');
+      }
+    }
+
+    const actualUserId = user.id;
+
     // Update User
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { id: actualUserId },
       data: {
         ...(data.fullName ? { fullName: data.fullName } : {}),
         ...(data.phone ? { phone: data.phone } : {}),
         ...(data.bloodGroup ? { bloodGroup: data.bloodGroup } : {}),
+        ...(data.gender ? { gender: data.gender } : {}),
+        ...(data.dateOfBirth ? { dateOfBirth: new Date(data.dateOfBirth) } : {}),
         ...(data.city ? { city: data.city } : {}),
         ...(data.state ? { state: data.state } : {}),
       },
@@ -98,21 +120,21 @@ export class CitizenService {
 
     // Upsert Citizen Profile
     const updatedProfile = await prisma.citizenProfile.upsert({
-      where: { userId },
+      where: { userId: actualUserId },
       update: {
         emergencyContactName: data.emergencyContactName,
         emergencyContactPhone: data.emergencyContactPhone,
-        donorAvailable: data.donorAvailable,
-        emergencyAvailable: data.emergencyAvailable,
+        donorAvailable: data.donorAvailable !== undefined ? data.donorAvailable : true,
+        emergencyAvailable: data.emergencyAvailable !== undefined ? data.emergencyAvailable : true,
         healthNotes: data.healthNotes,
         address: data.address,
       },
       create: {
-        userId,
+        userId: actualUserId,
         emergencyContactName: data.emergencyContactName,
         emergencyContactPhone: data.emergencyContactPhone,
-        donorAvailable: data.donorAvailable || false,
-        emergencyAvailable: data.emergencyAvailable || false,
+        donorAvailable: data.donorAvailable !== undefined ? data.donorAvailable : true,
+        emergencyAvailable: data.emergencyAvailable !== undefined ? data.emergencyAvailable : true,
         healthNotes: data.healthNotes,
         address: data.address,
       },

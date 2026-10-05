@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Building2,
@@ -11,29 +11,54 @@ import {
   MapPin
 } from 'lucide-react';
 import { REGISTERED_HOSPITALS } from '../../data/mockData';
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
+import { hospitalApi } from '../../services/hospitalApi';
+import type { Hospital } from '../../types';
 
 export const HospitalStaffLogin = () => {
   const navigate = useNavigate();
+  const [hospitals, setHospitals] = useState<Hospital[]>(REGISTERED_HOSPITALS);
   const [selectedId, setSelectedId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [error, setError] = useState('');
 
-  const filteredHospitals = REGISTERED_HOSPITALS.filter(
+  useEffect(() => {
+    let isMounted = true;
+    hospitalApi.getAll()
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (Array.isArray(res) && res.length > 0) {
+          setHospitals(res);
+        }
+      })
+      .catch((err) => {
+        console.warn('Using fallback hospitals list:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredHospitals = hospitals.filter(
     (h) =>
       h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      h.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      h.id.toLowerCase().includes(searchQuery.toLowerCase())
+      (h.city && h.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (h.id && h.id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (h.state && h.state.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (h.registrationNumber && h.registrationNumber.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const selectedHospital = REGISTERED_HOSPITALS.find((h) => h.id === selectedId);
+  const selectedHospital = hospitals.find((h) => h.id === selectedId || h.registrationNumber === selectedId);
 
   const handleContinue = () => {
     if (!selectedId) {
       setError('Please select your hospital before continuing.');
       return;
     }
-    navigate(`/hospital/${selectedId}/auth`);
+    const finalId = selectedHospital?.id || selectedId;
+    navigate(`/hospital/${finalId}/auth`);
   };
 
   return (
@@ -99,7 +124,7 @@ export const HospitalStaffLogin = () => {
                   setDropdownOpen(!dropdownOpen);
                   setError('');
                 }}
-                className={`w-full px-4 py-3.5 rounded-xl bg-slate-900 border transition-all text-sm font-semibold text-left flex items-center justify-between gap-3 ${
+                className={`w-full px-4 py-3.5 rounded-xl bg-slate-900 border transition-all text-sm font-semibold text-left flex items-center justify-between gap-3 cursor-pointer ${
                   selectedHospital
                     ? 'border-brand-red/50 text-white'
                     : error
@@ -114,7 +139,7 @@ export const HospitalStaffLogin = () => {
                   {selectedHospital ? (
                     <>
                       <span className="text-xs font-mono font-bold text-brand-red bg-red-950/50 border border-red-500/30 px-2 py-0.5 rounded-md shrink-0">
-                        {selectedHospital.id}
+                        {selectedHospital.registrationNumber || selectedHospital.id?.slice(0, 8)}
                       </span>
                       <span className="text-white">{selectedHospital.name}</span>
                     </>
@@ -160,7 +185,7 @@ export const HospitalStaffLogin = () => {
                             setSearchQuery('');
                             setError('');
                           }}
-                          className={`w-full text-left px-4 py-3.5 flex items-start gap-3 transition-colors hover:bg-white/5 border-b border-white/5 last:border-0 ${
+                          className={`w-full text-left px-4 py-3.5 flex items-start gap-3 transition-colors hover:bg-white/5 border-b border-white/5 last:border-0 cursor-pointer ${
                             selectedId === hospital.id ? 'bg-brand-red/10' : ''
                           }`}
                         >
@@ -175,7 +200,7 @@ export const HospitalStaffLogin = () => {
                                 {hospital.city}, {hospital.state}
                               </span>
                               <span className="text-[10px] font-mono text-brand-red/70 bg-red-950/40 px-1.5 py-0.5 rounded-md border border-red-900/50">
-                                {hospital.id}
+                                {hospital.registrationNumber || hospital.id?.slice(0, 8)}
                               </span>
                             </div>
                           </div>
@@ -221,12 +246,31 @@ export const HospitalStaffLogin = () => {
             type="button"
             onClick={handleContinue}
             disabled={!selectedId}
-            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed text-white font-bold text-sm shadow-xl transition-all flex items-center justify-center gap-2 group"
+            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed text-white font-bold text-sm shadow-xl transition-all flex items-center justify-center gap-2 group cursor-pointer"
             aria-label="Continue to hospital staff login"
           >
             <span>Continue to Staff Login</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform group-disabled:translate-x-0" />
           </button>
+
+          {/* GOOGLE SSO */}
+          <div className="space-y-3 pt-1">
+            <div className="relative flex items-center">
+              <div className="flex-grow border-t border-white/10"></div>
+              <span className="flex-shrink-0 mx-3 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+                Or Instant Staff Login
+              </span>
+              <div className="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <GoogleSignInButton
+              role="hospital_staff"
+              facilityId={selectedId || undefined}
+              returnUrl={selectedId ? `/hospital/${selectedId}/dashboard` : '/hospitals'}
+              label={selectedHospital ? `Sign in with Google (${selectedHospital.name})` : 'Sign in with Google (Hospital Staff)'}
+              variant="light"
+            />
+          </div>
 
           {/* FOOTNOTE */}
           <p className="text-center text-[11px] text-slate-500 leading-relaxed">

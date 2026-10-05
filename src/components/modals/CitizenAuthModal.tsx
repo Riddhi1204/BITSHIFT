@@ -1,35 +1,64 @@
 import { useState, useEffect } from 'react';
-import { X, Droplet, Heart, Mail, Lock, User, MapPin, Phone, Calendar } from 'lucide-react';
+import { 
+  X, 
+  Droplet, 
+  Heart, 
+  Mail, 
+  Lock, 
+  User, 
+  MapPin, 
+  Phone, 
+  Eye, 
+  EyeOff, 
+  Loader2, 
+  CheckCircle2, 
+  AlertCircle,
+  Sparkles,
+  ArrowRight
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { GoogleSignInButton } from '../auth/GoogleSignInButton';
+import { authApi } from '../../services/authApi';
 
 interface CitizenAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultTab?: 'login' | 'register';
 }
 
-export const CitizenAuthModal = ({ isOpen, onClose }: CitizenAuthModalProps) => {
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+export const CitizenAuthModal = ({ isOpen, onClose, defaultTab = 'login' }: CitizenAuthModalProps) => {
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>(defaultTab);
   const [showPassword, setShowPassword] = useState(false);
-  
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   const { loginCitizen } = useAuth();
   const navigate = useNavigate();
 
-  // Login State
+  // Login Form State
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Register State
-  const [regData, setRegData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    bloodGroup: '',
-    age: '',
-    location: '',
-    phone: '',
-  });
+  // Register Form State
+  const [regFullName, setRegFullName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regBloodGroup, setRegBloodGroup] = useState('O+');
+  const [regCity, setRegCity] = useState('');
+  const [regState, setRegState] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(defaultTab);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+    }
+  }, [isOpen, defaultTab]);
 
   // Handle ESC key and block body scroll
   useEffect(() => {
@@ -48,112 +77,218 @@ export const CitizenAuthModal = ({ isOpen, onClose }: CitizenAuthModalProps) => 
 
   if (!isOpen) return null;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginEmail && loginPassword) {
-      // Mock login - in a real app, verify with backend
-      loginCitizen({
-        name: loginEmail.split('@')[0], // fake name
-        email: loginEmail
-      });
-      onClose();
-      // Optional: navigate('/citizen/dashboard');
-    }
-  };
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (regData.password !== regData.confirmPassword) {
-      alert("Passwords do not match");
+    if (!loginEmail.trim() || !loginPassword) {
+      setErrorMessage('Please enter both your email address and password.');
       return;
     }
-    
-    loginCitizen({
-      name: regData.name || 'Citizen User',
-      email: regData.email
-    });
-    onClose();
+
+    try {
+      setSubmitting(true);
+      const res = await authApi.login({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+
+      setSuccessMessage('Welcome back! Logging you in...');
+      loginCitizen({
+        id: res.user.id,
+        name: res.user.fullName || loginEmail.split('@')[0],
+        email: res.user.email || loginEmail,
+        bloodGroup: res.user.bloodGroup,
+        phone: res.user.phone,
+        city: res.user.city,
+        state: res.user.state,
+        avatarUrl: res.user.avatarUrl,
+        role: res.user.role || 'citizen',
+      });
+
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Invalid email or password. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleGoogleAuth = () => {
-    loginCitizen({
-      name: 'Google User',
-      email: 'user@google.com'
-    });
-    onClose();
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (!regFullName.trim()) {
+      setErrorMessage('Please enter your full name.');
+      return;
+    }
+    if (!regEmail.trim()) {
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setErrorMessage('Password must be at least 6 characters long.');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setErrorMessage('Passwords do not match. Please verify.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await authApi.register({
+        fullName: regFullName.trim(),
+        email: regEmail.trim(),
+        password: regPassword,
+        phone: regPhone.trim(),
+        bloodGroup: regBloodGroup,
+        city: regCity.trim(),
+        state: regState.trim(),
+        role: 'citizen',
+      });
+
+      setSuccessMessage('Account created successfully! Welcome to HemoVite.');
+      loginCitizen({
+        id: res.user.id,
+        name: res.user.fullName || regFullName.trim(),
+        email: res.user.email || regEmail.trim(),
+        bloodGroup: res.user.bloodGroup || regBloodGroup,
+        phone: res.user.phone || regPhone.trim(),
+        city: res.user.city || regCity.trim(),
+        state: res.user.state || regState.trim(),
+        role: 'citizen',
+      });
+
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to create citizen account. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-      {/* OVERLAY */}
+      {/* BACKDROP BLUR OVERLAY */}
       <div 
-        className="absolute inset-0 bg-[#0B1220]/80 backdrop-blur-md"
+        className="absolute inset-0 bg-[#0B1220]/80 backdrop-blur-md transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
 
-      {/* MODAL CONTAINER */}
-      <div className="relative w-full max-w-4xl max-h-full flex flex-col md:flex-row bg-[#111827] rounded-3xl shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+      {/* MODAL CARD */}
+      <div 
+        className="relative w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row bg-[#111827] rounded-3xl shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* CLOSE BUTTON */}
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+          aria-label="Close authentication modal"
+          className="absolute top-4 right-4 z-20 w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors border border-white/5"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* LEFT SIDE - BRANDING */}
+        {/* LEFT SIDE - BRANDING BANNER (DESKTOP) */}
         <div className="hidden md:flex md:w-5/12 bg-[#0B1220] flex-col p-8 justify-between relative overflow-hidden border-r border-white/5">
-          <div className="absolute top-0 right-0 -mr-32 -mt-32 w-64 h-64 bg-brand-red/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 -ml-32 -mb-32 w-64 h-64 bg-brand-deep/20 rounded-full blur-3xl" />
+          <div className="absolute top-0 right-0 -mr-24 -mt-24 w-56 h-56 bg-brand-red/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 -ml-24 -mb-24 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
+          {/* LOGO */}
           <div className="relative z-10 flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-brand-red to-brand-deep rounded-xl flex items-center justify-center shadow-lg shadow-brand-red/30">
               <Droplet className="w-5 h-5 text-white fill-white/20" />
             </div>
-            <span className="text-xl font-black tracking-tight text-white">HemoVite</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-black tracking-tight text-white">
+                Hemo<span className="text-brand-bright">Vite</span>
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 bg-brand-blue/20 text-blue-400 border border-blue-500/30 rounded-full">
+                AI
+              </span>
+            </div>
           </div>
 
-          <div className="relative z-10 my-12 space-y-4">
-            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 mb-6">
+          {/* VALUE PROP */}
+          <div className="relative z-10 my-8 space-y-4">
+            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
               <Heart className="w-6 h-6 text-brand-red animate-pulse" />
             </div>
-            <h2 className="text-3xl font-black text-white leading-tight">
+            <h2 className="text-2xl font-black text-white leading-tight">
               Predict &bull; Connect &bull; Save Lives
             </h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Access your blood donation and emergency assistance dashboard.
+            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+              Join the intelligent voluntary blood donor network. Request emergency units in seconds or track your life-saving donations.
             </p>
+            <div className="space-y-2 pt-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Instant Emergency Blood Requisitions</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>AI-Matched Nearby Available Donors</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Donor Milestones & Verified Badges</span>
+              </div>
+            </div>
+          </div>
+
+          {/* FOOTER */}
+          <div className="relative z-10 text-[11px] text-slate-500">
+            Encrypted & HIPAA Compliant Healthcare Protocol
           </div>
         </div>
 
-        {/* RIGHT SIDE - FORM */}
-        <div className="w-full md:w-7/12 p-6 sm:p-8 flex flex-col relative overflow-y-auto max-h-[85vh] custom-scrollbar">
+        {/* RIGHT SIDE - FORM CONTAINER */}
+        <div className="w-full md:w-7/12 p-6 sm:p-8 flex flex-col relative overflow-y-auto max-h-[90vh]">
           
-          <div className="mb-6">
-            <h2 className="text-2xl font-black text-white">Welcome to HemoVite</h2>
-            <p className="text-slate-400 mt-1 text-sm">
-              Login or create your citizen account
+          {/* HEADER */}
+          <div className="mb-5 text-center sm:text-left">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 text-brand-bright border border-red-500/20 text-[11px] font-bold mb-2">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Citizen Portal Access</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-white">
+              Welcome to HemoVite
+            </h2>
+            <p className="text-slate-400 mt-1 text-xs sm:text-sm">
+              Access the Citizen & Voluntary Donor Portal
             </p>
           </div>
 
-          {/* TABS */}
-          <div className="flex bg-[#0B1220] p-1 rounded-xl border border-white/5 mb-6 shrink-0">
+          {/* TABS (LOGIN / REGISTER) */}
+          <div className="flex bg-[#0B1220] p-1.5 rounded-2xl border border-white/10 mb-6 shrink-0">
             <button
-              onClick={() => setActiveTab('login')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+              type="button"
+              onClick={() => { setActiveTab('login'); setErrorMessage(null); setSuccessMessage(null); }}
+              className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
                 activeTab === 'login' 
-                  ? 'bg-brand-red text-white shadow-md' 
+                  ? 'bg-gradient-to-r from-brand-deep to-brand-red text-white shadow-lg shadow-red-900/30' 
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               Login
             </button>
             <button
-              onClick={() => setActiveTab('register')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+              type="button"
+              onClick={() => { setActiveTab('register'); setErrorMessage(null); setSuccessMessage(null); }}
+              className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
                 activeTab === 'register' 
-                  ? 'bg-brand-red text-white shadow-md' 
+                  ? 'bg-gradient-to-r from-brand-deep to-brand-red text-white shadow-lg shadow-red-900/30' 
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -161,238 +296,327 @@ export const CitizenAuthModal = ({ isOpen, onClose }: CitizenAuthModalProps) => 
             </button>
           </div>
 
-          {/* FORMS */}
-          {activeTab === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-4 flex-1">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 ml-1">Email Address</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <Mail className="w-4 h-4 text-slate-500" />
-                  </div>
-                  <input
-                    type="email"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 focus:ring-1 focus:ring-brand-red/50 rounded-xl text-sm text-white transition-all outline-none"
-                    placeholder="Enter your email"
-                  />
-                </div>
+          {/* ALERTS */}
+          {errorMessage && (
+            <div className="mb-4 p-3.5 bg-red-950/60 border border-red-500/40 rounded-xl text-red-300 text-xs flex items-center gap-2.5 animate-in shake">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-4 p-3.5 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          )}
+
+          {/* 1. LOGIN TAB */}
+          {activeTab === 'login' && (
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              
+              {/* GOOGLE SIGN IN */}
+              <div>
+                <GoogleSignInButton
+                  role="citizen"
+                  label="Continue with Google"
+                  variant="dark"
+                  fullWidth={true}
+                  className="!py-3 !rounded-xl !bg-[#1E293B] hover:!bg-[#334155] !border-white/10"
+                />
               </div>
 
+              {/* DIVIDER */}
+              <div className="flex items-center my-4">
+                <div className="flex-1 border-t border-white/10" />
+                <span className="px-3 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Or with email</span>
+                <div className="flex-1 border-t border-white/10" />
+              </div>
+
+              {/* EMAIL */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 ml-1">Password</label>
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Email Address</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full px-4 py-3 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all"
+                />
+              </div>
+
+              {/* PASSWORD */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Password</span>
+                  </label>
+                  <Link
+                    to="/citizen/forgot-password"
+                    onClick={onClose}
+                    className="text-xs text-brand-bright hover:underline"
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <Lock className="w-4 h-4 text-slate-500" />
-                  </div>
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2.5 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 focus:ring-1 focus:ring-brand-red/50 rounded-xl text-sm text-white transition-all outline-none"
-                    placeholder="Enter your password"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
                   >
-                    <div className="w-4 h-4 rounded-full border border-current opacity-70" />
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-1">
-                <button 
+              {/* SUBMIT BUTTON */}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-brand-deep to-brand-red hover:from-brand-red hover:to-red-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-900/30 flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Login to Citizen Portal</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <div className="text-center pt-2 text-xs text-slate-400">
+                Don't have an account yet?{' '}
+                <button
                   type="button"
-                  onClick={() => {
-                    onClose();
-                    navigate('/citizen/forgot-password');
-                  }} 
-                  className="text-xs font-semibold text-brand-red hover:text-red-400 transition-colors"
+                  onClick={() => setActiveTab('register')}
+                  className="text-brand-bright font-bold hover:underline ml-1"
                 >
-                  Forgot Password?
+                  Create one now
                 </button>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 mt-2 bg-brand-red hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-brand-red/20 transition-all active:scale-[0.98]"
-              >
-                Login
-              </button>
             </form>
-          ) : (
-            <form onSubmit={handleRegister} className="space-y-4 flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 ml-1">Full Name</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="w-4 h-4 text-slate-500" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={regData.name}
-                      onChange={(e) => setRegData({ ...regData, name: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 rounded-xl text-sm text-white outline-none"
-                      placeholder="John Doe"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 ml-1">Email</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="w-4 h-4 text-slate-500" />
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      value={regData.email}
-                      onChange={(e) => setRegData({ ...regData, email: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 rounded-xl text-sm text-white outline-none"
-                      placeholder="john@example.com"
-                    />
-                  </div>
-                </div>
+          )}
+
+          {/* 2. REGISTER TAB */}
+          {activeTab === 'register' && (
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              
+              {/* GOOGLE SIGN IN */}
+              <div>
+                <GoogleSignInButton
+                  role="citizen"
+                  label="Continue with Google"
+                  variant="dark"
+                  fullWidth={true}
+                  className="!py-3 !rounded-xl !bg-[#1E293B] hover:!bg-[#334155] !border-white/10"
+                />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 ml-1">Password</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="w-4 h-4 text-slate-500" />
-                    </div>
-                    <input
-                      type="password"
-                      required
-                      minLength={8}
-                      value={regData.password}
-                      onChange={(e) => setRegData({ ...regData, password: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 rounded-xl text-sm text-white outline-none"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 ml-1">Confirm Password</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="w-4 h-4 text-slate-500" />
-                    </div>
-                    <input
-                      type="password"
-                      required
-                      value={regData.confirmPassword}
-                      onChange={(e) => setRegData({ ...regData, confirmPassword: e.target.value })}
-                      className="w-full pl-9 pr-3 py-2 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 rounded-xl text-sm text-white outline-none"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                </div>
+              {/* DIVIDER */}
+              <div className="flex items-center my-3">
+                <div className="flex-1 border-t border-white/10" />
+                <span className="px-3 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Or register with email</span>
+                <div className="flex-1 border-t border-white/10" />
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 ml-1">Blood Group</label>
-                  <select
-                    required
-                    value={regData.bloodGroup}
-                    onChange={(e) => setRegData({ ...regData, bloodGroup: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 rounded-xl text-sm text-white outline-none appearance-none"
-                  >
-                    <option value="" disabled>Select</option>
-                    {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
-                      <option key={bg} value={bg}>{bg}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 ml-1">Age</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                      <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                    </div>
-                    <input
-                      type="number"
-                      required
-                      min={18}
-                      max={65}
-                      value={regData.age}
-                      onChange={(e) => setRegData({ ...regData, age: e.target.value })}
-                      className="w-full pl-8 pr-2 py-2 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 rounded-xl text-sm text-white outline-none"
-                      placeholder="18+"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                  <label className="text-xs font-bold text-slate-300 ml-1">Phone</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                      <Phone className="w-3.5 h-3.5 text-slate-500" />
-                    </div>
-                    <input
-                      type="tel"
-                      required
-                      value={regData.phone}
-                      onChange={(e) => setRegData({ ...regData, phone: e.target.value })}
-                      className="w-full pl-8 pr-2 py-2 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 rounded-xl text-sm text-white outline-none"
-                      placeholder="Number"
-                    />
-                  </div>
-                </div>
-              </div>
-
+              {/* FULL NAME */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 ml-1">Location / City</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MapPin className="w-4 h-4 text-slate-500" />
-                  </div>
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Full Name</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={regFullName}
+                  onChange={(e) => setRegFullName(e.target.value)}
+                  placeholder="e.g. Vishal Sharma"
+                  className="w-full px-4 py-2.5 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all"
+                />
+              </div>
+
+              {/* EMAIL & PHONE GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Email Address</span>
+                  </label>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    value={regData.location}
-                    onChange={(e) => setRegData({ ...regData, location: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2 bg-[#0B1220] border border-white/10 focus:border-brand-red/50 rounded-xl text-sm text-white outline-none"
-                    placeholder="Enter your city"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full px-3.5 py-2.5 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Phone Number</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={regPhone}
+                    onChange={(e) => setRegPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full px-3.5 py-2.5 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all"
                   />
                 </div>
               </div>
 
+              {/* BLOOD GROUP & LOCATION */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Droplet className="w-3.5 h-3.5 text-red-400" />
+                    <span>Blood Group</span>
+                  </label>
+                  <select
+                    value={regBloodGroup}
+                    onChange={(e) => setRegBloodGroup(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#0B1220] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all"
+                  >
+                    {bloodGroups.map((bg) => (
+                      <option key={bg} value={bg} className="bg-[#111827] text-white">
+                        {bg}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    <span>City</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={regCity}
+                    onChange={(e) => setRegCity(e.target.value)}
+                    placeholder="e.g. Ranchi"
+                    className="w-full px-3 py-2.5 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    <span>State</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={regState}
+                    onChange={(e) => setRegState(e.target.value)}
+                    placeholder="e.g. Jharkhand"
+                    className="w-full px-3 py-2.5 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* PASSWORD & CONFIRM PASSWORD */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Password</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="At least 6 chars"
+                      className="w-full px-3.5 py-2.5 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Confirm Password</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      placeholder="Repeat password"
+                      className="w-full px-3.5 py-2.5 bg-[#0B1220] border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red transition-all pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* SUBMIT BUTTON */}
               <button
                 type="submit"
-                className="w-full py-3 mt-4 bg-brand-red hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-brand-red/20 transition-all active:scale-[0.98]"
+                disabled={submitting}
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-brand-deep to-brand-red hover:from-brand-red hover:to-red-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-900/30 flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-2"
               >
-                Create Account
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create Citizen Account</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
+
+              <div className="text-center pt-2 text-xs text-slate-400">
+                Already registered?{' '}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('login')}
+                  className="text-brand-bright font-bold hover:underline ml-1"
+                >
+                  Login here
+                </button>
+              </div>
+
             </form>
           )}
-
-          <div className="relative flex items-center py-4 shrink-0">
-            <div className="flex-grow border-t border-white/5"></div>
-            <span className="flex-shrink-0 mx-4 text-slate-500 text-xs font-medium uppercase">Or</span>
-            <div className="flex-grow border-t border-white/5"></div>
-          </div>
-
-          <button
-            onClick={handleGoogleAuth}
-            className="w-full py-3 bg-white hover:bg-slate-50 text-slate-900 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-3 shrink-0"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-            </svg>
-            <span>Continue with Google</span>
-          </button>
 
         </div>
 
@@ -400,3 +624,5 @@ export const CitizenAuthModal = ({ isOpen, onClose }: CitizenAuthModalProps) => 
     </div>
   );
 };
+
+export default CitizenAuthModal;

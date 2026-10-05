@@ -113,14 +113,14 @@ export class BloodBankService {
     const batches = await prisma.inventoryBatch.findMany({
       where: {
         inventory: {
-          bloodBankId,
+          bloodBankId: bloodBank.id,
         },
       },
       orderBy: { expiryDate: 'asc' },
     });
 
     const donations = await prisma.donation.findMany({
-      where: { bloodBankId },
+      where: { bloodBankId: bloodBank.id },
       include: {
         donor: {
           select: { id: true, fullName: true, phone: true, bloodGroup: true, email: true },
@@ -130,7 +130,7 @@ export class BloodBankService {
     });
 
     const campaigns = await prisma.donationCampaign.findMany({
-      where: { bloodBankId },
+      where: { bloodBankId: bloodBank.id },
       orderBy: { startTime: 'desc' },
     });
 
@@ -148,8 +148,11 @@ export class BloodBankService {
    * Update or add blood inventory units
    */
   static async updateInventory(bloodBankId: string, bloodGroup: string, units: number, component: string = 'whole_blood') {
+    const bloodBank = await this.getBloodBankById(bloodBankId);
+    const resolvedId = bloodBank ? bloodBank.id : bloodBankId;
+
     const existing = await prisma.bloodInventory.findFirst({
-      where: { bloodBankId, bloodGroup, component },
+      where: { bloodBankId: resolvedId, bloodGroup, component },
     });
 
     if (existing) {
@@ -163,7 +166,7 @@ export class BloodBankService {
     } else {
       return await prisma.bloodInventory.create({
         data: {
-          bloodBankId,
+          bloodBankId: resolvedId,
           bloodGroup,
           component,
           unitsAvailable: units,

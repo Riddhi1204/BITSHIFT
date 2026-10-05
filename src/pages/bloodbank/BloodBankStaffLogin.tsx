@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Droplet,
@@ -11,30 +11,54 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { REGISTERED_BLOOD_BANKS } from '../../data/mockData';
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
+import { bloodBankApi } from '../../services/bloodBankApi';
+import type { BloodBank } from '../../types';
 
 export const BloodBankStaffLogin = () => {
   const navigate = useNavigate();
+  const [bloodBanks, setBloodBanks] = useState<BloodBank[]>(REGISTERED_BLOOD_BANKS);
   const [selectedId, setSelectedId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [error, setError] = useState('');
 
-  const filteredBloodBanks = REGISTERED_BLOOD_BANKS.filter(
+  useEffect(() => {
+    let isMounted = true;
+    bloodBankApi.getAll()
+      .then((res: any) => {
+        if (!isMounted) return;
+        if (Array.isArray(res) && res.length > 0) {
+          setBloodBanks(res);
+        }
+      })
+      .catch((err) => {
+        console.warn('Using fallback blood bank list:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredBloodBanks = bloodBanks.filter(
     (b) =>
       b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.state.toLowerCase().includes(searchQuery.toLowerCase())
+      (b.city && b.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (b.id && b.id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (b.state && b.state.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (b.registrationNumber && b.registrationNumber.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const selectedBloodBank = REGISTERED_BLOOD_BANKS.find((b) => b.id === selectedId);
+  const selectedBloodBank = bloodBanks.find((b) => b.id === selectedId || b.registrationNumber === selectedId);
 
   const handleContinue = () => {
     if (!selectedId) {
       setError('Please select your blood bank before continuing.');
       return;
     }
-    navigate(`/blood-bank/${selectedId}/auth`);
+    const finalId = selectedBloodBank?.id || selectedId;
+    navigate(`/blood-bank/${finalId}/auth`);
   };
 
   return (
@@ -100,7 +124,7 @@ export const BloodBankStaffLogin = () => {
                   setDropdownOpen(!dropdownOpen);
                   setError('');
                 }}
-                className={`w-full flex items-center justify-between p-3.5 rounded-2xl bg-[#1E293B]/80 border transition-all text-left ${
+                className={`w-full flex items-center justify-between p-3.5 rounded-2xl bg-[#1E293B]/80 border transition-all text-left cursor-pointer ${
                   error
                     ? 'border-red-500 ring-2 ring-red-500/20'
                     : dropdownOpen
@@ -119,7 +143,7 @@ export const BloodBankStaffLogin = () => {
                       <p className="text-sm font-bold text-white truncate">{selectedBloodBank.name}</p>
                       <p className="text-xs text-slate-400 truncate flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
-                        {selectedBloodBank.city}, {selectedBloodBank.state} • ID: {selectedBloodBank.id}
+                        {selectedBloodBank.city}, {selectedBloodBank.state} • ID: {selectedBloodBank.registrationNumber || selectedBloodBank.id}
                       </p>
                     </div>
                   </div>
@@ -163,18 +187,18 @@ export const BloodBankStaffLogin = () => {
                             setDropdownOpen(false);
                             setError('');
                           }}
-                          className={`w-full p-3 text-left hover:bg-white/5 transition-colors flex items-center justify-between gap-2 ${
+                          className={`w-full p-3 text-left hover:bg-white/5 transition-colors flex items-center justify-between gap-2 cursor-pointer ${
                             selectedId === b.id ? 'bg-brand-red/20 text-white' : 'text-slate-300'
                           }`}
                         >
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-white truncate">{b.name}</p>
                             <p className="text-[11px] text-slate-400 truncate">
-                              {b.city}, {b.state} • Units: {b.totalUnits}
+                              {b.city}, {b.state} • Total Units: {b.totalUnits || 0}
                             </p>
                           </div>
                           <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded shrink-0">
-                            {b.id}
+                            {b.registrationNumber || b.id?.slice(0, 8)}
                           </span>
                         </button>
                       ))
@@ -195,11 +219,30 @@ export const BloodBankStaffLogin = () => {
           <button
             type="button"
             onClick={handleContinue}
-            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-brand-red/30 flex items-center justify-center gap-2 transition-all hover:brightness-105 active:scale-[0.99]"
+            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-brand-red to-brand-deep hover:from-red-600 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-brand-red/30 flex items-center justify-center gap-2 transition-all hover:brightness-105 active:scale-[0.99] cursor-pointer"
           >
             <span>Continue to Staff Login</span>
             <ArrowRight className="w-4 h-4" />
           </button>
+
+          {/* GOOGLE SSO */}
+          <div className="space-y-3 pt-1">
+            <div className="relative flex items-center">
+              <div className="flex-grow border-t border-white/10"></div>
+              <span className="flex-shrink-0 mx-3 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+                Or Instant Staff Login
+              </span>
+              <div className="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <GoogleSignInButton
+              role="blood_bank_staff"
+              facilityId={selectedId || undefined}
+              returnUrl={selectedId ? `/blood-bank/${selectedId}/dashboard` : '/blood-banks'}
+              label={selectedBloodBank ? `Sign in with Google (${selectedBloodBank.name})` : 'Sign in with Google (Blood Bank Staff)'}
+              variant="light"
+            />
+          </div>
 
           {/* HELP NOTE */}
           <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-slate-400 space-y-1">

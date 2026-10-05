@@ -29,6 +29,8 @@ import type { UserRole } from './types';
 import { CitizenAuth } from './pages/citizen/CitizenAuth';
 import { CitizenForgotPassword } from './pages/citizen/CitizenForgotPassword';
 import { CitizenDashboard } from './pages/citizen/CitizenDashboard';
+import { CitizenOnboarding } from './pages/citizen/CitizenOnboarding';
+import { AuthCallback } from './pages/auth/AuthCallback';
 import { CitizenFindBlood } from './pages/citizen/CitizenFindBlood';
 import { CitizenRequestBlood } from './pages/citizen/CitizenRequestBlood';
 import { CitizenHospitals } from './pages/citizen/CitizenHospitals';
@@ -53,9 +55,11 @@ import { GovernmentReports } from './pages/government/GovernmentReports';
 import { GovernmentNotifications } from './pages/government/GovernmentNotifications';
 import { GovernmentProfile } from './pages/government/GovernmentProfile';
 import { GovernmentSettings } from './pages/government/GovernmentSettings';
+import { useAuth } from './contexts/AuthContext';
 
 export function App() {
   const navigate = useNavigate();
+  const { citizenUser } = useAuth();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
   const [finderModalOpen, setFinderModalOpen] = useState(false);
@@ -75,7 +79,11 @@ export function App() {
       return;
     }
     if (role === 'citizen') {
-      setCitizenAuthModalOpen(true);
+      if (citizenUser) {
+        navigate('/citizen/dashboard');
+      } else {
+        setCitizenAuthModalOpen(true);
+      }
       return;
     }
     setSelectedRole(role);
@@ -115,8 +123,13 @@ export function App() {
           }
         />
 
+        {/* AUTH CALLBACK ROUTE FOR GOOGLE OAUTH */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
+
         {/* CITIZEN ROUTES */}
         <Route path="/citizen/auth" element={<CitizenAuth />} />
+        <Route path="/citizen/onboarding" element={<CitizenOnboarding />} />
+        <Route path="/onboarding" element={<CitizenOnboarding />} />
         <Route path="/citizen/forgot-password" element={<CitizenForgotPassword />} />
 
         {/* Protected Citizen Routes wrapped in CitizenLayout */}
@@ -135,7 +148,9 @@ export function App() {
         {/* HOSPITAL PORTAL FLOW */}
         <Route path="/hospitals" element={<HospitalList />} />
         {/* Staff Login must be before /:hospitalId to avoid route conflict */}
+        <Route path="/hospital/login" element={<HospitalStaffLogin />} />
         <Route path="/hospital/staff-login" element={<HospitalStaffLogin />} />
+        <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
         <Route path="/hospital/:hospitalId" element={<HospitalDetails />} />
         <Route path="/hospital/:hospitalId/auth" element={<HospitalAuth />} />
         <Route path="/hospital/:hospitalId/dashboard" element={<HospitalDashboard />} />
@@ -146,7 +161,9 @@ export function App() {
         {/* BLOOD BANK PORTAL FLOW */}
         <Route path="/blood-banks" element={<BloodBankList />} />
         {/* Staff Login must be before /:bloodBankId to avoid route conflict */}
+        <Route path="/blood-bank/login" element={<BloodBankStaffLogin />} />
         <Route path="/blood-bank/staff-login" element={<BloodBankStaffLogin />} />
+        <Route path="/blood-bank/dashboard" element={<BloodBankDashboard />} />
         <Route path="/blood-bank/:bloodBankId" element={<BloodBankDetails />} />
         <Route path="/blood-bank/:bloodBankId/auth" element={<BloodBankAuth />} />
         <Route path="/blood-bank/:bloodBankId/dashboard" element={<BloodBankDashboard />} />

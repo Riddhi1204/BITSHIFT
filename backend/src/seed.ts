@@ -262,11 +262,11 @@ async function main() {
 
     if (bankId) {
       for (const [group, units] of Object.entries(stock)) {
-        const inv = await prisma.bloodInventory.findFirst({
+        let inv = await prisma.bloodInventory.findFirst({
           where: { bloodBankId: bankId, bloodGroup: group },
         });
         if (!inv) {
-          await prisma.bloodInventory.create({
+          inv = await prisma.bloodInventory.create({
             data: {
               bloodBankId: bankId,
               bloodGroup: group,
@@ -275,10 +275,103 @@ async function main() {
             },
           });
         }
+
+        // Create sample inventory batches with various expiry dates
+        const existingBatches = await prisma.inventoryBatch.count({ where: { inventoryId: inv.id } });
+        if (existingBatches === 0) {
+          const now = new Date();
+          const sampleBatches = [
+            {
+              batchNumber: `BATCH-${bb.registrationNumber}-${group}-01`,
+              bloodGroup: group,
+              component: 'Whole Blood',
+              units: Math.max(2, Math.floor(units * 0.2)),
+              collectionDate: new Date(now.getTime() - 32 * 24 * 60 * 60 * 1000),
+              expiryDate: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), // Expiring in 3 days
+              status: 'available',
+            },
+            {
+              batchNumber: `BATCH-${bb.registrationNumber}-${group}-02`,
+              bloodGroup: group,
+              component: 'Packed Red Blood Cells',
+              units: Math.max(3, Math.floor(units * 0.4)),
+              collectionDate: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000),
+              expiryDate: new Date(now.getTime() + 25 * 24 * 60 * 60 * 1000), // Safe (25 days)
+              status: 'available',
+            },
+            {
+              batchNumber: `BATCH-${bb.registrationNumber}-${group}-03`,
+              bloodGroup: group,
+              component: 'Platelets',
+              units: Math.max(1, Math.floor(units * 0.1)),
+              collectionDate: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000),
+              expiryDate: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000), // Expired 1 day ago
+              status: 'available',
+            },
+            {
+              batchNumber: `BATCH-${bb.registrationNumber}-${group}-04`,
+              bloodGroup: group,
+              component: 'Fresh Frozen Plasma',
+              units: Math.max(2, Math.floor(units * 0.15)),
+              collectionDate: new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000),
+              expiryDate: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
+              status: 'available',
+            },
+          ];
+
+          for (const b of sampleBatches) {
+            await prisma.inventoryBatch.create({
+              data: {
+                ...b,
+                inventoryId: inv.id,
+              },
+            });
+          }
+        }
       }
     }
   }
-  console.log('✓ Blood Banks & Inventory seeded');
+  console.log('✓ Blood Banks & Inventory Batches seeded');
+
+  // 6. Seed Sample Waste Records for Analytics
+  const wasteCount = await prisma.wasteRecord.count();
+  if (wasteCount === 0) {
+    const allBanks = await prisma.bloodBank.findMany();
+    const demoUser = await prisma.user.findFirst({ where: { role: 'hospital_staff' } });
+    const now = new Date();
+
+    const sampleWaste = [
+      { bloodGroup: 'O+', units: 4, reason: 'Expired', component: 'Whole Blood', daysAgo: 2 },
+      { bloodGroup: 'A+', units: 2, reason: 'Temperature Excursion', component: 'Platelets', daysAgo: 5 },
+      { bloodGroup: 'B+', units: 3, reason: 'Damaged Bag', component: 'Packed Red Blood Cells', daysAgo: 8 },
+      { bloodGroup: 'AB+', units: 5, reason: 'Expired', component: 'Whole Blood', daysAgo: 12 },
+      { bloodGroup: 'O-', units: 1, reason: 'Leakage', component: 'Packed Red Blood Cells', daysAgo: 15 },
+      { bloodGroup: 'A-', units: 2, reason: 'Contamination', component: 'Platelets', daysAgo: 20 },
+      { bloodGroup: 'B-', units: 1, reason: 'Processing Error', component: 'Fresh Frozen Plasma', daysAgo: 25 },
+      { bloodGroup: 'O+', units: 6, reason: 'Expired', component: 'Whole Blood', daysAgo: 35 },
+      { bloodGroup: 'A+', units: 3, reason: 'Temperature Excursion', component: 'Platelets', daysAgo: 45 },
+    ];
+
+    for (let i = 0; i < sampleWaste.length; i++) {
+      const sw = sampleWaste[i];
+      const bank = allBanks[i % allBanks.length];
+      if (bank) {
+        await prisma.wasteRecord.create({
+          data: {
+            bloodBankId: bank.id,
+            bloodGroup: sw.bloodGroup,
+            component: sw.component,
+            units: sw.units,
+            reason: sw.reason,
+            notes: `Recorded during routine quality assurance audit.`,
+            recordedById: demoUser?.id || null,
+            wastedAt: new Date(now.getTime() - sw.daysAgo * 24 * 60 * 60 * 1000),
+          },
+        });
+      }
+    }
+    console.log('✓ Initial Waste Records & Audit trail seeded');
+  }
 
   console.log('🎉 Seeding successfully completed!');
 }

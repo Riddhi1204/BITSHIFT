@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { GovernmentLayout } from '../../components/government/GovernmentLayout';
 import { governmentApi } from '../../services/governmentApi';
+import { ExpiryWasteSection } from '../../components/inventory/ExpiryWasteSection';
 import type { HospitalApplication, BloodHotspot, GovStats } from '../../types';
 
 export const GovernmentDashboard = () => {
@@ -658,6 +659,13 @@ export const GovernmentDashboard = () => {
             )}
           </div>
         </div>
+
+        {/* 7. NATIONAL EXPIRY & WASTE MANAGEMENT AGGREGATOR */}
+        <ExpiryWasteSection
+          role="government"
+          title="National Expiry & Waste Oversight"
+          subtitle="Aggregated cold-chain shelf-life telemetry, regulatory discard audits, and high-waste organization analytics"
+        />
 
         {/* REVIEW MODAL */}
         {reviewingHosp && (
