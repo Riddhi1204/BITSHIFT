@@ -14,14 +14,16 @@ import {
   X,
   ChevronRight,
   ShieldCheck,
-  Activity
+  Activity,
+  User,
+  Clock
 } from 'lucide-react';
 import { DEFAULT_GOV_USER, MOCK_GOV_ALERTS } from '../../data/mockData';
 import type { GovernmentUser } from '../../types';
 
 interface GovernmentLayoutProps {
   children: React.ReactNode;
-  activeNav?: 'dashboard' | 'hospitals' | 'hotspots' | 'donations' | 'supply' | 'reports' | 'settings';
+  activeNav?: 'dashboard' | 'hospitals' | 'hotspots' | 'donations' | 'supply' | 'reports' | 'notifications' | 'profile' | 'settings';
 }
 
 export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: GovernmentLayoutProps) => {
@@ -30,14 +32,14 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [user, setUser] = useState<GovernmentUser | null>(null);
-  const [alerts, setAlerts] = useState(MOCK_GOV_ALERTS);
+  const [alerts] = useState(MOCK_GOV_ALERTS);
 
-  // Authentication check
+  // Authentication check & session restoration
   useEffect(() => {
     const storedUser = localStorage.getItem('hemovite_gov_user');
     if (!storedUser) {
-      // If user is not authenticated, redirect to login
-      navigate('/government/login', { replace: true });
+      // If user is not authenticated, redirect to /government/auth
+      navigate('/government/auth', { replace: true });
     } else {
       try {
         setUser(JSON.parse(storedUser));
@@ -49,7 +51,7 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
 
   const handleLogout = () => {
     localStorage.removeItem('hemovite_gov_user');
-    navigate('/government/login');
+    navigate('/government/auth');
   };
 
   const navItems = [
@@ -73,8 +75,16 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
       label: 'Urgent Blood Hotspots',
       path: '/government/hotspots',
       icon: AlertOctagon,
-      badge: '18 Critical',
+      badge: '7 Critical',
       badgeColor: 'bg-red-500/20 text-red-300 border-red-500/40',
+    },
+    {
+      id: 'supply',
+      label: 'Blood Availability',
+      path: '/government/supply',
+      icon: Layers,
+      badge: '10 States',
+      badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
     },
     {
       id: 'donations',
@@ -84,23 +94,31 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
       badge: null,
     },
     {
-      id: 'supply',
-      label: 'Regional Blood Supply',
-      path: '/government/supply',
-      icon: Layers,
-      badge: '10 States',
-      badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-    },
-    {
       id: 'reports',
-      label: 'National Reports',
+      label: 'Regional Reports',
       path: '/government/reports',
       icon: FileText,
       badge: null,
     },
     {
+      id: 'notifications',
+      label: 'Notifications',
+      path: '/government/notifications',
+      icon: Bell,
+      badge: alerts.filter(a => !a.resolved).length > 0 ? `${alerts.filter(a => !a.resolved).length} New` : null,
+      badgeColor: 'bg-red-500/20 text-red-300 border-red-500/40',
+    },
+    {
+      id: 'profile',
+      label: 'Profile',
+      path: '/government/profile',
+      icon: User,
+      badge: user?.verificationStatus === 'Pending Verification' ? 'Pending' : 'Verified',
+      badgeColor: user?.verificationStatus === 'Pending Verification' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    },
+    {
       id: 'settings',
-      label: 'Portal Settings',
+      label: 'Settings',
       path: '/government/settings',
       icon: Settings,
       badge: null,
@@ -108,6 +126,7 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
   ];
 
   const unreadAlertsCount = alerts.filter(a => !a.resolved).length;
+  const isVerified = user?.verificationStatus === 'Verified';
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col selection:bg-brand-red selection:text-white font-sans">
@@ -155,14 +174,14 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
               {/* LIVE SYNC STATUS BADGE */}
               <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/60 text-xs text-slate-300">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Live Telemetry Active</span>
+                <span>Live Network Telemetry Active</span>
               </div>
 
               {/* NOTIFICATIONS DROPDOWN */}
               <div className="relative">
                 <button
                   onClick={() => setNotifOpen(!notifOpen)}
-                  className="relative p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-all"
+                  className="relative p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
                   title="Government Emergency Alerts"
                 >
                   <Bell className="w-5 h-5" />
@@ -175,7 +194,7 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
 
                 {/* NOTIFICATIONS PANEL */}
                 {notifOpen && (
-                  <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl bg-[#0F172A] border border-slate-700 shadow-2xl text-slate-100 z-50 p-4 space-y-3">
+                  <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl bg-[#0F172A] border border-slate-700 shadow-2xl text-slate-100 z-50 p-4 space-y-3 animate-in fade-in zoom-in-95">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                       <div className="flex items-center gap-2">
                         <AlertOctagon className="w-4 h-4 text-red-400" />
@@ -205,7 +224,7 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
                                   setNotifOpen(false);
                                   navigate('/government/hotspots');
                                 }}
-                                className="text-blue-400 hover:underline flex items-center gap-1 font-medium"
+                                className="text-blue-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
                               >
                                 View Hotspot <ChevronRight className="w-3 h-3" />
                               </button>
@@ -216,28 +235,30 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
                     </div>
 
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-                      <button
-                        onClick={() => {
-                          setAlerts(alerts.map(a => ({ ...a, resolved: true })));
-                        }}
-                        className="text-slate-400 hover:text-white transition-colors"
+                      <Link
+                        to="/government/notifications"
+                        onClick={() => setNotifOpen(false)}
+                        className="text-slate-300 hover:text-white font-semibold"
                       >
-                        Mark all acknowledged
-                      </button>
+                        View all notifications
+                      </Link>
                       <Link
                         to="/government/hotspots"
                         onClick={() => setNotifOpen(false)}
                         className="text-red-400 hover:text-red-300 font-semibold"
                       >
-                        View all critical alerts →
+                        Critical alerts →
                       </Link>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* USER PROFILE INFO */}
-              <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-slate-800">
+              {/* USER PROFILE BADGE & LINK */}
+              <Link
+                to="/government/profile"
+                className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-slate-800 hover:opacity-90 transition-opacity"
+              >
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-600 flex items-center justify-center text-slate-200 font-bold text-sm shadow-inner">
                   {user?.name ? user.name.charAt(0) : 'G'}
                 </div>
@@ -246,16 +267,25 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
                     {user?.name || DEFAULT_GOV_USER.name}
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    <span>State Health Admin</span>
+                    {isVerified ? (
+                      <>
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-300">Verified Officer</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-3 h-3 text-amber-400" />
+                        <span className="text-amber-300">Pending Verification</span>
+                      </>
+                    )}
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* LOGOUT BUTTON */}
               <button
                 onClick={handleLogout}
-                className="p-2 sm:px-3 sm:py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 hover:text-white flex items-center gap-1.5 text-xs font-semibold transition-all"
+                className="p-2 sm:px-3 sm:py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 hover:text-white flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer"
                 title="Log out of Government Portal"
               >
                 <LogOut className="w-4 h-4" />
@@ -277,7 +307,7 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
         <aside className="hidden lg:block w-64 flex-shrink-0 space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-3.5 space-y-1">
             <div className="px-3 py-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-              Intelligence Modules
+              Government Command
             </div>
 
             {navItems.map((item) => {
@@ -305,18 +335,28 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
                 </Link>
               );
             })}
+
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-semibold text-xs text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
 
           {/* NATIONAL HELPLINE CARD */}
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-4 shadow-sm border border-slate-700 space-y-3">
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-4 shadow-sm border border-slate-700 space-y-2.5">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-red-600/30 border border-red-500 flex items-center justify-center">
                 <Landmark className="w-4 h-4 text-red-400" />
               </div>
-              <span className="font-bold text-xs text-white">Emergency Control</span>
+              <span className="font-bold text-xs text-white">Emergency Dispatch</span>
             </div>
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              24x7 Central Blood Transfusion Emergency Helpdesk for Inter-State Dispatches.
+              24x7 Central Blood Transfusion Emergency Helpdesk for Inter-State Transit.
             </p>
             <div className="pt-1 flex items-center justify-between text-xs font-bold text-red-300">
               <span>Toll Free: 1800-11-2443</span>
@@ -327,7 +367,7 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
         {/* MOBILE NAVIGATION DRAWER */}
         {mobileMenuOpen && (
           <div className="lg:hidden fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm flex">
-            <div className="w-72 bg-white h-full shadow-2xl p-5 flex flex-col justify-between overflow-y-auto">
+            <div className="w-72 bg-white h-full shadow-2xl p-5 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-left duration-200">
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                   <div className="flex items-center gap-2">
@@ -336,7 +376,7 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
                   </div>
                   <button
                     onClick={() => setMobileMenuOpen(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -375,7 +415,7 @@ export const GovernmentLayout = ({ children, activeNav = 'dashboard' }: Governme
               <div className="pt-4 border-t border-slate-200">
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-50 text-red-700 font-bold text-xs"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-50 text-red-700 font-bold text-xs cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Log Out of Session</span>

@@ -12,7 +12,8 @@ import {
   X,
   MapPin,
   Bed,
-  FileCheck
+  FileCheck,
+  HelpCircle
 } from 'lucide-react';
 import { GovernmentLayout } from '../../components/government/GovernmentLayout';
 import { MOCK_HOSPITAL_APPLICATIONS } from '../../data/mockData';
@@ -24,9 +25,17 @@ export const GovernmentHospitals = () => {
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Verified' | 'Under Review' | 'Rejected'>('All');
   const [stateFilter, setStateFilter] = useState('All');
   
+  // Inspection / Review Modal
+  const [reviewingHosp, setReviewingHosp] = useState<HospitalApplication | null>(null);
+
   // Rejection modal state
   const [rejectingHosp, setRejectingHosp] = useState<HospitalApplication | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  // Request Info modal state
+  const [requestInfoHosp, setRequestInfoHosp] = useState<HospitalApplication | null>(null);
+  const [requestInfoNote, setRequestInfoNote] = useState('');
+
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const triggerToast = (msg: string) => {
@@ -75,6 +84,7 @@ export const GovernmentHospitals = () => {
           : h
       )
     );
+    setReviewingHosp(null);
     triggerToast(`Hospital ${hosp.name} (${hosp.id}) approved and verified successfully!`);
   };
 
@@ -105,7 +115,39 @@ export const GovernmentHospitals = () => {
 
     triggerToast(`Application for ${rejectingHosp.name} has been rejected.`);
     setRejectingHosp(null);
+    setReviewingHosp(null);
     setRejectReason('');
+  };
+
+  const handleConfirmRequestInfo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestInfoHosp || !requestInfoNote.trim()) return;
+
+    setHospitals((prev) =>
+      prev.map((h) =>
+        h.id === requestInfoHosp.id
+          ? {
+              ...h,
+              status: 'Under Review',
+              requestedInfoNote: requestInfoNote,
+              auditLog: [
+                ...h.auditLog,
+                {
+                  action: 'Information Requested',
+                  by: 'Dr. Rajeshwar Sharma (DGHS)',
+                  date: new Date().toISOString().slice(0, 16).replace('T', ' '),
+                  note: requestInfoNote,
+                },
+              ],
+            }
+          : h
+      )
+    );
+
+    triggerToast(`Information request sent to ${requestInfoHosp.name}.`);
+    setRequestInfoHosp(null);
+    setReviewingHosp(null);
+    setRequestInfoNote('');
   };
 
   const stats = {
@@ -299,18 +341,18 @@ export const GovernmentHospitals = () => {
                       {/* Actions */}
                       <td className="py-4 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Link
-                            to={`/government/hospitals/${hosp.id}`}
-                            className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-1 transition-colors"
+                          <button
+                            onClick={() => setReviewingHosp(hosp)}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-1 transition-colors cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            <span>Details</span>
-                          </Link>
+                            <span>Review</span>
+                          </button>
 
                           {hosp.status !== 'Verified' && (
                             <button
                               onClick={() => handleApprove(hosp)}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-xs"
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-2xs cursor-pointer"
                             >
                               Verify
                             </button>
@@ -322,7 +364,7 @@ export const GovernmentHospitals = () => {
                                 setRejectingHosp(hosp);
                                 setRejectReason('');
                               }}
-                              className="px-2 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs transition-colors border border-red-200"
+                              className="px-2 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs transition-colors border border-red-200 cursor-pointer"
                             >
                               Reject
                             </button>
@@ -342,7 +384,7 @@ export const GovernmentHospitals = () => {
                           setStatusFilter('All');
                           setStateFilter('All');
                         }}
-                        className="text-xs text-red-600 font-bold hover:underline"
+                        className="text-xs text-red-600 font-bold hover:underline cursor-pointer"
                       >
                         Reset filters
                       </button>
@@ -355,8 +397,109 @@ export const GovernmentHospitals = () => {
         </div>
 
         {/* ======================================================== */}
-        {/* REJECTION REASON CONFIRMATION MODAL                      */}
+        {/* REVIEW MODAL (FEATURE 1 INSPECTION PANEL)                */}
         {/* ======================================================== */}
+        {reviewingHosp && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-5 border border-slate-200 max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2 text-slate-900 font-black text-lg">
+                  <Building2 className="w-5 h-5 text-red-600" />
+                  <span>Hospital Verification Panel: {reviewingHosp.name}</span>
+                </div>
+                <button
+                  onClick={() => setReviewingHosp(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* HOSPITAL INFO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-xl bg-slate-50 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Hospital Name & ID</span>
+                  <div className="font-bold text-slate-900">{reviewingHosp.name} ({reviewingHosp.id})</div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Location & Jurisdiction</span>
+                  <div className="font-bold text-slate-900">{reviewingHosp.address}, {reviewingHosp.city}, {reviewingHosp.state}</div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Contact Details</span>
+                  <div className="font-mono text-slate-900">{reviewingHosp.contact} • {reviewingHosp.email}</div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bed & ICU Capacity</span>
+                  <div className="font-bold text-slate-900">{reviewingHosp.bedCapacity} Beds ({reviewingHosp.icuCapacity})</div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 space-y-1 sm:col-span-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Linked Blood Bank Facility</span>
+                  <div className="font-bold text-slate-900">{reviewingHosp.bloodBankLinked}</div>
+                </div>
+              </div>
+
+              {/* COMPLIANCE DOCUMENTS */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Submitted Verification Documents ({reviewingHosp.documents.length}):
+                </span>
+                <div className="space-y-1.5">
+                  {reviewingHosp.documents.map((doc, idx) => (
+                    <div key={idx} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-800">{doc.name}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        {doc.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequestInfoHosp(reviewingHosp);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>Request Information</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectingHosp(reviewingHosp);
+                      setRejectReason('');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 font-bold text-xs transition-all cursor-pointer"
+                  >
+                    Reject
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleApprove(reviewingHosp)}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                  >
+                    Verify Hospital
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* REJECTION REASON CONFIRMATION MODAL */}
         {rejectingHosp && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 border border-slate-200 animate-in zoom-in-95">
@@ -367,7 +510,7 @@ export const GovernmentHospitals = () => {
                 </div>
                 <button
                   onClick={() => setRejectingHosp(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -402,15 +545,66 @@ export const GovernmentHospitals = () => {
                   <button
                     type="button"
                     onClick={() => setRejectingHosp(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md"
+                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md cursor-pointer"
                   >
                     Confirm Rejection
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* REQUEST INFORMATION MODAL */}
+        {requestInfoHosp && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 animate-in zoom-in-95">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2 text-blue-600 font-bold text-sm">
+                  <HelpCircle className="w-5 h-5" />
+                  <span>Request Information from Hospital</span>
+                </div>
+                <button
+                  onClick={() => setRequestInfoHosp(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600">
+                Specify clarifications or missing documents required from <strong>{requestInfoHosp.name}</strong>:
+              </p>
+
+              <form onSubmit={handleConfirmRequestInfo} className="space-y-3">
+                <textarea
+                  required
+                  rows={3}
+                  value={requestInfoNote}
+                  onChange={(e) => setRequestInfoNote(e.target.value)}
+                  placeholder="e.g. Please upload the cold room temperature logs for the last quarter..."
+                  className="w-full p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-slate-900 bg-slate-50/50"
+                />
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRequestInfoHosp(null)}
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md cursor-pointer"
+                  >
+                    Send Clarification Request
                   </button>
                 </div>
               </form>

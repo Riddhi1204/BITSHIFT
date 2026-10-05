@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 import {
-  AlertOctagon,
   Flame,
   Search,
   MapPin,
-  Clock,
   Send,
   CheckCircle2,
-  Zap
+  Zap,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import { GovernmentLayout } from '../../components/government/GovernmentLayout';
 import { MOCK_BLOOD_HOTSPOTS } from '../../data/mockData';
@@ -17,11 +17,14 @@ export const GovernmentHotspots = () => {
   const [hotspots] = useState<BloodHotspot[]>(MOCK_BLOOD_HOTSPOTS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('All');
-  const [selectedSeverity, setSelectedSeverity] = useState<'All' | 'Critical' | 'High' | 'Moderate' | 'Stable'>('All');
+  const [selectedRisk, setSelectedRisk] = useState<'All' | 'Critical' | 'High' | 'Moderate' | 'Stable'>('All');
   const [selectedGroup, setSelectedGroup] = useState('All');
+  const [timePeriod, setTimePeriod] = useState('Last 7 Days');
+  const [activeHotspot, setActiveHotspot] = useState<BloodHotspot>(MOCK_BLOOD_HOTSPOTS[0]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const bloodGroups = ['All', 'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+  const timePeriods = ['Today', 'Last 7 Days', 'Last 30 Days'];
 
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
@@ -41,22 +44,22 @@ export const GovernmentHotspots = () => {
         h.mostRequiredGroup.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchState = selectedState === 'All' || h.state === selectedState;
-      const matchSeverity = selectedSeverity === 'All' || h.severity === selectedSeverity;
+      const matchRisk = selectedRisk === 'All' || h.severity === selectedRisk;
       const matchGroup =
         selectedGroup === 'All' ||
-        h.mostRequiredGroup === selectedGroup ||
+        h.bloodGroup === selectedGroup ||
         Boolean(h.bloodGroupShortages[selectedGroup]);
 
-      return matchSearch && matchState && matchSeverity && matchGroup;
+      return matchSearch && matchState && matchRisk && matchGroup;
     });
-  }, [hotspots, searchQuery, selectedState, selectedSeverity, selectedGroup]);
+  }, [hotspots, searchQuery, selectedState, selectedRisk, selectedGroup]);
 
   const handleTriggerDispatch = (hotspot: BloodHotspot) => {
     triggerToast(`🚨 Emergency Buffer Dispatch Protocol initialized for ${hotspot.city}! Inter-district transit active.`);
   };
 
   const totalDeficitUnits = hotspots.reduce((acc, curr) => acc + curr.totalShortage, 0);
-  const totalPatientsAffected = hotspots.reduce((acc, curr) => acc + curr.patientsAffected, 0);
+  const totalEmergencyReqs = hotspots.reduce((acc, curr) => acc + curr.emergencyRequests, 0);
   const criticalCount = hotspots.filter((h) => h.severity === 'Critical').length;
 
   return (
@@ -83,54 +86,39 @@ export const GovernmentHotspots = () => {
                 Urgent Blood Requirement Hotspots
               </h1>
               <p className="text-xs sm:text-sm text-slate-500">
-                Real-time regional blood shortages, critical group deficits, patient load, and inter-district emergency routing.
+                Visual geographic tracking of regional blood shortages, high demand zones, and inter-district emergency buffer routing.
               </p>
             </div>
 
             {/* KEY METRICS SUMMARY */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="px-4 py-2 rounded-2xl bg-red-50 border border-red-200 text-center">
-                <span className="text-[10px] font-bold text-red-700 uppercase block">Critical Cities</span>
+            <div className="flex items-center gap-2 flex-wrap text-center">
+              <div className="px-4 py-2 rounded-2xl bg-red-50 border border-red-200">
+                <span className="text-[10px] font-bold text-red-700 uppercase block">Critical Shortage Areas</span>
                 <span className="text-lg font-black text-red-900 font-mono">{criticalCount}</span>
               </div>
-              <div className="px-4 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-center">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Deficit</span>
+              <div className="px-4 py-2 rounded-2xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">Aggregate Deficit</span>
                 <span className="text-lg font-black text-slate-900 font-mono">{totalDeficitUnits} Units</span>
               </div>
-              <div className="px-4 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-center">
-                <span className="text-[10px] font-bold text-amber-700 uppercase block">Patients Impacted</span>
-                <span className="text-lg font-black text-amber-900 font-mono">{totalPatientsAffected}</span>
+              <div className="px-4 py-2 rounded-2xl bg-amber-50 border border-amber-200">
+                <span className="text-[10px] font-bold text-amber-700 uppercase block">Emergency Requests</span>
+                <span className="text-lg font-black text-amber-900 font-mono">{totalEmergencyReqs} Active</span>
               </div>
             </div>
           </div>
 
-          {/* FILTERS TOOLBAR */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 pt-2 border-t border-slate-100">
+          {/* FILTERS TOOLBAR (SECTION 13) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 pt-3 border-t border-slate-100">
             {/* Search */}
-            <div className="lg:col-span-4 relative">
+            <div className="lg:col-span-3 relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search city, state, or blood group..."
-                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 text-xs sm:text-sm text-slate-900 bg-slate-50/50"
+                placeholder="Search city, district, or state..."
+                className="w-full pl-10 pr-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 text-xs sm:text-sm text-slate-900 bg-slate-50/50"
               />
-            </div>
-
-            {/* Severity Filter */}
-            <div className="lg:col-span-3">
-              <select
-                value={selectedSeverity}
-                onChange={(e) => setSelectedSeverity(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 text-xs sm:text-sm text-slate-900 bg-slate-50/50 font-medium"
-              >
-                <option value="All">All Severity Levels</option>
-                <option value="Critical">🔴 Critical Deficit</option>
-                <option value="High">🟠 High Demand</option>
-                <option value="Moderate">🟡 Moderate Demand</option>
-                <option value="Stable">🟢 Stable Buffer</option>
-              </select>
             </div>
 
             {/* Blood Group Filter */}
@@ -142,13 +130,41 @@ export const GovernmentHotspots = () => {
               >
                 {bloodGroups.map((grp) => (
                   <option key={grp} value={grp}>
-                    {grp === 'All' ? 'All Blood Groups' : `Filter by ${grp}`}
+                    {grp === 'All' ? 'All Blood Groups' : `Blood Group: ${grp}`}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* State Filter */}
+            {/* Risk Level Filter */}
+            <div className="lg:col-span-2">
+              <select
+                value={selectedRisk}
+                onChange={(e) => setSelectedRisk(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 text-xs sm:text-sm text-slate-900 bg-slate-50/50 font-medium"
+              >
+                <option value="All">All Risk Levels</option>
+                <option value="Critical">🔴 Critical (Deficit)</option>
+                <option value="High">🟠 High Demand</option>
+                <option value="Moderate">🟡 Moderate Demand</option>
+                <option value="Stable">🟢 Adequate Buffer</option>
+              </select>
+            </div>
+
+            {/* Time Period Filter */}
+            <div className="lg:col-span-2">
+              <select
+                value={timePeriod}
+                onChange={(e) => setTimePeriod(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 text-xs sm:text-sm text-slate-900 bg-slate-50/50 font-medium"
+              >
+                {timePeriods.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* State Location Filter */}
             <div className="lg:col-span-2">
               <select
                 value={selectedState}
@@ -166,174 +182,200 @@ export const GovernmentHotspots = () => {
         </div>
 
         {/* ======================================================== */}
-        {/* HOTSPOTS GRID (MAP-STYLE DETAILED CARDS)                 */}
+        {/* INTERACTIVE GEOGRAPHIC HOTSPOT MAP & DETAIL PANEL        */}
         {/* ======================================================== */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredHotspots.length > 0 ? (
-            filteredHotspots.map((hotspot) => {
-              const isCrit = hotspot.severity === 'Critical';
-              const isHigh = hotspot.severity === 'High';
-              const isMod = hotspot.severity === 'Moderate';
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* LEFT 7 COLS: GEOGRAPHIC MAP VISUALIZER */}
+          <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-slate-700" />
+                <h3 className="font-bold text-base text-slate-900">National Hotspots Map (OpenStreetMap Telemetry)</h3>
+              </div>
+              <span className="text-xs text-slate-400 font-mono">Live Grid Sync</span>
+            </div>
 
-              return (
-                <div
-                  key={hotspot.id}
-                  className={`bg-white rounded-3xl border p-6 sm:p-7 shadow-sm space-y-5 transition-all relative overflow-hidden ${
-                    isCrit
-                      ? 'border-red-300 ring-1 ring-red-200'
-                      : isHigh
-                      ? 'border-orange-300'
-                      : 'border-slate-200'
-                  }`}
-                >
-                  {/* TOP ACCENT LINE */}
-                  <div
-                    className={`absolute top-0 left-0 right-0 h-1.5 ${
-                      isCrit ? 'bg-red-600' : isHigh ? 'bg-orange-500' : isMod ? 'bg-amber-400' : 'bg-emerald-500'
-                    }`}
-                  />
+            {/* MAP CANVAS SIMULATOR WITH PINS */}
+            <div className="relative w-full h-80 rounded-2xl bg-gradient-to-br from-slate-900 via-[#0B1120] to-slate-950 border border-slate-800 p-4 overflow-hidden flex items-center justify-center">
+              
+              {/* SUBTLE MAP GRID LINES */}
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:2rem_2rem] opacity-40" />
 
-                  {/* CARD HEADER */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-5 h-5 text-red-600" />
-                        <h2 className="text-xl font-black text-slate-900">
+              {/* MAP LEGEND (SECTION 11) */}
+              <div className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-xl p-2.5 space-y-1 text-[10px] text-slate-300 shadow-md">
+                <div className="font-bold uppercase tracking-wider text-white">Risk Legend</div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-600" /><span>Red: Critical shortage</span></div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /><span>Orange: High demand</span></div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" /><span>Yellow: Moderate demand</span></div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span>Green: Adequate buffer</span></div>
+              </div>
+
+              {/* MAP PINS FOR FILTERED HOTSPOTS */}
+              <div className="relative z-10 w-full h-full flex items-center justify-center">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {filteredHotspots.map((hotspot) => {
+                    const isSelected = activeHotspot.id === hotspot.id;
+                    const isCrit = hotspot.severity === 'Critical';
+                    const isHigh = hotspot.severity === 'High';
+                    const isMod = hotspot.severity === 'Moderate';
+
+                    return (
+                      <button
+                        key={hotspot.id}
+                        onClick={() => setActiveHotspot(hotspot)}
+                        className={`p-2 rounded-xl text-left transition-all border flex flex-col items-center gap-1 cursor-pointer ${
+                          isSelected
+                            ? 'bg-red-600 text-white border-white scale-110 shadow-lg shadow-red-900/50 ring-2 ring-white/50'
+                            : isCrit
+                            ? 'bg-red-950/80 text-red-300 border-red-700 hover:bg-red-900'
+                            : isHigh
+                            ? 'bg-orange-950/80 text-orange-300 border-orange-700 hover:bg-orange-900'
+                            : isMod
+                            ? 'bg-amber-950/80 text-amber-300 border-amber-700 hover:bg-amber-900'
+                            : 'bg-emerald-950/80 text-emerald-300 border-emerald-700 hover:bg-emerald-900'
+                        }`}
+                      >
+                        <MapPin className="w-4 h-4" />
+                        <span className="text-[11px] font-black leading-tight text-center truncate max-w-[80px]">
                           {hotspot.city}
-                        </h2>
-                        <span className="text-xs text-slate-500 font-medium">({hotspot.state})</span>
-                      </div>
-                      <span className="text-[11px] text-slate-400 mt-0.5 block">
-                        Last telemetry update: {hotspot.lastUpdated}
-                      </span>
-                    </div>
+                        </span>
+                        <span className="text-[9px] font-mono opacity-80">{hotspot.bloodGroup}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
 
-                    <span
-                      className={`text-xs font-black uppercase px-3 py-1 rounded-full ${
-                        isCrit
-                          ? 'bg-red-100 text-red-700 border border-red-300 animate-pulse'
-                          : isHigh
-                          ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                          : isMod
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+            {/* HOTSPOTS SELECTABLE LIST */}
+            <div className="space-y-2 pt-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Monitored Deficit Centers ({filteredHotspots.length})
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                {filteredHotspots.map((h) => {
+                  const isSelected = activeHotspot.id === h.id;
+                  return (
+                    <div
+                      key={h.id}
+                      onClick={() => setActiveHotspot(h)}
+                      className={`p-3 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
+                        isSelected
+                          ? 'border-red-600 bg-red-50/60 font-bold'
+                          : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
                       }`}
                     >
-                      {isCrit ? '🔴 Critical Deficit' : isHigh ? '🟠 High Demand' : isMod ? '🟡 Moderate' : '🟢 Stable'}
-                    </span>
-                  </div>
-
-                  {/* IMPACT METRICS */}
-                  <div className="grid grid-cols-3 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-center">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Shortage</span>
-                      <span className="text-lg font-black text-red-600 font-mono block mt-0.5">
-                        {hotspot.totalShortage}u
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Patients</span>
-                      <span className="text-lg font-black text-slate-900 font-mono block mt-0.5">
-                        {hotspot.patientsAffected}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Hospitals</span>
-                      <span className="text-lg font-black text-slate-900 font-mono block mt-0.5">
-                        {hotspot.hospitalsAffected}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* BLOOD GROUP DEFICIT BREAKDOWN */}
-                  <div className="space-y-2">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                      Blood Component Deficit Breakdown:
-                    </span>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      {Object.entries(hotspot.bloodGroupShortages).map(([grp, data]) => {
-                        const netDeficit = Math.max(0, data.required - data.available);
-                        return (
-                          <div
-                            key={grp}
-                            className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1 shadow-2xs"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-black text-slate-900 text-sm">{grp}</span>
-                              <span
-                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                                  data.urgency === 'Critical'
-                                    ? 'bg-red-100 text-red-700'
-                                    : 'bg-amber-100 text-amber-700'
-                                }`}
-                              >
-                                {data.urgency}
-                              </span>
-                            </div>
-
-                            <div className="text-[11px] text-slate-500 flex justify-between">
-                              <span>Req: <strong className="text-slate-900">{data.required}u</strong></span>
-                              <span>Avail: <strong className="text-slate-700">{data.available}u</strong></span>
-                            </div>
-
-                            <div className="text-[11px] font-black text-red-600 pt-0.5 border-t border-slate-100">
-                              Deficit: {netDeficit} Units
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* ACTION PLAN RECOMMENDATION */}
-                  {hotspot.actionPlan && (
-                    <div className="p-3.5 rounded-2xl bg-red-950/5 border border-red-200/80 text-xs space-y-1">
-                      <div className="font-bold text-red-900 flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 text-red-600" />
-                        <span>AI Transfusion Response Action Plan:</span>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                        <span className="text-slate-900 font-bold">{h.city}</span>
+                        <span className="text-[10px] text-slate-400">({h.state})</span>
                       </div>
-                      <p className="text-slate-700 leading-relaxed">{hotspot.actionPlan}</p>
+                      <span className="font-mono text-red-600 font-bold">{h.bloodGroup} (-{h.totalShortage}u)</span>
                     </div>
-                  )}
-
-                  {/* BOTTOM ACTION BUTTONS */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-500 font-semibold flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Window: {hotspot.urgencyWindow}</span>
-                    </span>
-
-                    <button
-                      onClick={() => handleTriggerDispatch(hotspot)}
-                      className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Mobilize Buffer Transfer</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="col-span-2 bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-500 space-y-3">
-              <AlertOctagon className="w-10 h-10 mx-auto text-slate-300" />
-              <p className="font-bold text-slate-800">No hotspots matching selected filters</p>
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedState('All');
-                  setSelectedSeverity('All');
-                  setSelectedGroup('All');
-                }}
-                className="text-xs text-red-600 font-bold hover:underline"
-              >
-                Clear all filters
-              </button>
+                  );
+                })}
+              </div>
             </div>
-          )}
+          </div>
+
+          {/* RIGHT 5 COLS: HOTSPOT INFORMATION PANEL (SECTION 12) */}
+          <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-5 flex flex-col justify-between">
+            <div className="space-y-4">
+              
+              {/* TOP LOCATION & RISK BADGE */}
+              <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-red-600" />
+                    <h3 className="text-xl font-black text-slate-900">{activeHotspot.city}</h3>
+                    <span className="text-xs text-slate-500 font-medium">({activeHotspot.state})</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                    Last Updated: {activeHotspot.lastUpdated}
+                  </span>
+                </div>
+
+                <span
+                  className={`text-xs font-black uppercase px-3 py-1 rounded-full ${
+                    activeHotspot.severity === 'Critical'
+                      ? 'bg-red-100 text-red-700 border border-red-300 animate-pulse'
+                      : activeHotspot.severity === 'High'
+                      ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                      : activeHotspot.severity === 'Moderate'
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                      : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  }`}
+                >
+                  {activeHotspot.severity} Risk
+                </span>
+              </div>
+
+              {/* AI SHORTAGE PREDICTION (SECTION 23) */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-red-50 to-orange-50 border border-red-200/80 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                    <Sparkles className="w-4 h-4 text-red-600" />
+                    <span>AI Shortage Risk:</span>
+                  </div>
+                  <span className="font-mono font-black text-red-700">{activeHotspot.aiShortageRisk}</span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  Real-time demand forecasting and predictive hospital draw velocity.
+                </p>
+              </div>
+
+              {/* SECTION 12 METRICS TABLE */}
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Critical Blood Group:</span>
+                  <span className="font-mono font-black text-red-600 text-sm">{activeHotspot.bloodGroup}</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Units Required:</span>
+                  <span className="font-mono font-bold text-slate-900">{activeHotspot.unitsRequired} Units</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Units Available:</span>
+                  <span className="font-mono font-bold text-emerald-700">{activeHotspot.unitsAvailable} Units</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Net Calculated Shortage:</span>
+                  <span className="font-mono font-black text-red-600">{activeHotspot.totalShortage} Units</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Active Emergency Requests:</span>
+                  <span className="font-mono font-bold text-amber-700">{activeHotspot.emergencyRequests} Requests</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Hospitals Affected:</span>
+                  <span className="font-bold text-slate-900">{activeHotspot.hospitalsAffected} Facilities</span>
+                </div>
+              </div>
+
+              {/* ACTION PLAN */}
+              {activeHotspot.actionPlan && (
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                  <span className="font-bold text-slate-700 flex items-center gap-1">
+                    <Zap className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Recommended Mobilization:</span>
+                  </span>
+                  <p className="text-slate-600 leading-relaxed">{activeHotspot.actionPlan}</p>
+                </div>
+              )}
+            </div>
+
+            {/* ACTION BUTTON */}
+            <button
+              onClick={() => handleTriggerDispatch(activeHotspot)}
+              className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer mt-3"
+            >
+              <Send className="w-4 h-4" />
+              <span>Mobilize Emergency Buffer Dispatch</span>
+            </button>
+          </div>
+
         </div>
 
       </div>

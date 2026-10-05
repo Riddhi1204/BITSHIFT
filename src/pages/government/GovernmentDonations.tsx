@@ -5,10 +5,8 @@ import {
 } from 'lucide-react';
 import { GovernmentLayout } from '../../components/government/GovernmentLayout';
 import { MOCK_DONATION_RECORDS } from '../../data/mockData';
-import type { DonationRecord } from '../../types';
 
 export const GovernmentDonations = () => {
-  const [donations] = useState<DonationRecord[]>(MOCK_DONATION_RECORDS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('All');
   const [selectedGroup, setSelectedGroup] = useState('All');
@@ -21,26 +19,32 @@ export const GovernmentDonations = () => {
     return ['All', ...list.sort()];
   }, []);
 
-  const filteredDonations = useMemo(() => {
-    return donations.filter((d) => {
+  // Section 14 Specific Regional Metrics
+  const rawRegionalMetrics = [
+    { city: 'Kolkata', state: 'West Bengal', units: 4210, donors: 2450, topGroup: 'O+', change: '+18.4%', camps: 9 },
+    { city: 'New Delhi', state: 'Delhi NCR', units: 3120, donors: 1980, topGroup: 'B+', change: '+12.1%', camps: 14 },
+    { city: 'Ranchi', state: 'Jharkhand', units: 2480, donors: 1420, topGroup: 'O-', change: '+15.6%', camps: 6 },
+    { city: 'Jamshedpur', state: 'Jharkhand', units: 1840, donors: 1120, topGroup: 'A+', change: '+8.9%', camps: 5 },
+    { city: 'Bengaluru', state: 'Karnataka', units: 3900, donors: 2300, topGroup: 'AB-', change: '+14.0%', camps: 11 },
+    { city: 'Mumbai', state: 'Maharashtra', units: 4850, donors: 2890, topGroup: 'O+', change: '+16.2%', camps: 15 },
+  ];
+
+  const regionalDonationMetrics = useMemo(() => {
+    return rawRegionalMetrics.filter((reg) => {
       const matchSearch =
-        d.donorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.centerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.id.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchCity = selectedCity === 'All' || d.city === selectedCity;
-      const matchGroup = selectedGroup === 'All' || d.bloodGroup === selectedGroup;
-
+        reg.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        reg.state.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchCity = selectedCity === 'All' || reg.city === selectedCity;
+      const matchGroup = selectedGroup === 'All' || reg.topGroup === selectedGroup;
       return matchSearch && matchCity && matchGroup;
     });
-  }, [donations, searchQuery, selectedCity, selectedGroup]);
+  }, [searchQuery, selectedCity, selectedGroup]);
 
-  // Aggregate donation counts for chart simulation
+  // Section 14 Distribution by Blood Group
   const bloodGroupDistribution = [
     { group: 'O+', units: 7800, percentage: 31.4, color: 'bg-red-600' },
-    { group: 'A+', units: 5200, percentage: 20.9, color: 'bg-rose-500' },
     { group: 'B+', units: 6100, percentage: 24.5, color: 'bg-blue-600' },
+    { group: 'A+', units: 5200, percentage: 20.9, color: 'bg-rose-500' },
     { group: 'AB+', units: 2100, percentage: 8.5, color: 'bg-purple-600' },
     { group: 'O-', units: 1450, percentage: 5.8, color: 'bg-red-800' },
     { group: 'A-', units: 980, percentage: 3.9, color: 'bg-rose-700' },
@@ -48,17 +52,7 @@ export const GovernmentDonations = () => {
     { group: 'AB-', units: 400, percentage: 1.6, color: 'bg-purple-800' },
   ];
 
-  const cityDonationRankings = [
-    { city: 'Delhi NCR', units: 5400, state: 'Delhi', activeCamps: 14 },
-    { city: 'Mumbai', units: 4850, state: 'Maharashtra', activeCamps: 12 },
-    { city: 'Bengaluru', units: 3900, state: 'Karnataka', activeCamps: 9 },
-    { city: 'Chennai', units: 3450, state: 'Tamil Nadu', activeCamps: 8 },
-    { city: 'Ranchi', units: 2450, state: 'Jharkhand', activeCamps: 6 },
-    { city: 'Kolkata', units: 2300, state: 'West Bengal', activeCamps: 7 },
-    { city: 'Patna', units: 1850, state: 'Bihar', activeCamps: 5 },
-    { city: 'Lucknow', units: 1650, state: 'Uttar Pradesh', activeCamps: 4 },
-  ];
-
+  // Section 14 Monthly Donation Timeline
   const monthlyTimeline = [
     { month: 'Oct 25', units: 3100, height: '55%' },
     { month: 'Nov 25', units: 3400, height: '62%' },
@@ -78,24 +72,24 @@ export const GovernmentDonations = () => {
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold uppercase tracking-wider">
                 <BarChart3 className="w-3.5 h-3.5" />
-                <span>National Donor Engagement & Supply Metrics</span>
+                <span>Aggregated Regional Intelligence</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Blood Donation Analytics
+                Blood Donations by Area
               </h1>
               <p className="text-xs sm:text-sm text-slate-500">
-                Track voluntary donor turnouts, mobile donation drives, component collection velocity, and emergency apheresis.
+                Track total donations, regional unit yields, monthly collection velocity, and blood component distributions.
               </p>
             </div>
 
             {/* TIME RANGE SELECTOR */}
             <div className="flex items-center gap-2">
               <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
-                {['Last 7 Days', 'Last 30 Days', 'This Quarter', 'All Time'].map((range) => (
+                {['Today', 'Last 7 Days', 'Last 30 Days', 'This Month'].map((range) => (
                   <button
                     key={range}
                     onClick={() => setDateRange(range)}
-                    className={`px-3 py-1.5 rounded-xl transition-all ${
+                    className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                       dateRange === range
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
@@ -116,7 +110,7 @@ export const GovernmentDonations = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search donor name, center, city, or ID..."
+                placeholder="Search collection center, district, city, or ID..."
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 text-xs sm:text-sm text-slate-900 bg-slate-50/50"
               />
             </div>
@@ -129,7 +123,7 @@ export const GovernmentDonations = () => {
               >
                 {cities.map((c) => (
                   <option key={c} value={c}>
-                    {c === 'All' ? 'All Cities / Districts' : c}
+                    {c === 'All' ? 'All Monitored Cities / Districts' : c}
                   </option>
                 ))}
               </select>
@@ -143,7 +137,7 @@ export const GovernmentDonations = () => {
               >
                 {bloodGroups.map((g) => (
                   <option key={g} value={g}>
-                    {g === 'All' ? 'All Blood Groups' : `Group: ${g}`}
+                    {g === 'All' ? 'All Blood Groups' : `Blood Group: ${g}`}
                   </option>
                 ))}
               </select>
@@ -152,79 +146,86 @@ export const GovernmentDonations = () => {
         </div>
 
         {/* ======================================================== */}
-        {/* KPI SUMMARY CARDS (5 METRICS)                            */}
+        {/* KPI SUMMARY CARDS (SECTION 14)                           */}
         {/* ======================================================== */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm space-y-1">
             <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Donations</span>
-            <div className="text-2xl font-black text-slate-900 font-mono">24,850</div>
-            <p className="text-[10px] text-emerald-600 font-medium">↑ 14.2% from last month</p>
+            <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">8,920</div>
+            <p className="text-[10px] text-emerald-600 font-medium">↑ 16.4% this month</p>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm space-y-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase block">Units Collected</span>
-            <div className="text-2xl font-black text-red-600 font-mono">24,850 Units</div>
-            <p className="text-[10px] text-slate-400">Whole Blood & Components</p>
+            <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Units Collected</span>
+            <div className="text-2xl sm:text-3xl font-black text-red-600 font-mono">8,920 Units</div>
+            <p className="text-[10px] text-slate-400">Verified Network Yield</p>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm space-y-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase block">Active Donors</span>
-            <div className="text-2xl font-black text-blue-600 font-mono">14,200</div>
-            <p className="text-[10px] text-blue-600 font-medium">Registered in network</p>
+            <span className="text-[10px] font-bold text-slate-500 uppercase block">Active Voluntary Donors</span>
+            <div className="text-2xl sm:text-3xl font-black text-blue-600 font-mono">14,200</div>
+            <p className="text-[10px] text-blue-600 font-medium">Registered in Network</p>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm space-y-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase block">Daily Average</span>
-            <div className="text-2xl font-black text-purple-600 font-mono">340 Units/day</div>
+            <span className="text-[10px] font-bold text-slate-500 uppercase block">Daily Average Volume</span>
+            <div className="text-2xl sm:text-3xl font-black text-purple-600 font-mono">340 Units/Day</div>
             <p className="text-[10px] text-slate-400">National pace</p>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm space-y-1 col-span-2 sm:col-span-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase block">Emergency Turnouts</span>
-            <div className="text-2xl font-black text-rose-600 font-mono">1,840 Units</div>
-            <p className="text-[10px] text-rose-600 font-medium">Direct trauma dispatch</p>
           </div>
         </div>
 
         {/* ======================================================== */}
-        {/* CHARTS SECTION (4 INTERACTIVE SVG & VISUAL PANELS)       */}
+        {/* CHARTS (SECTION 14 - BAR, LINE, DONUT)                   */}
         {/* ======================================================== */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* CHART 1 (7 COLS): BLOOD DONATIONS OVER TIME (TIMELINE) */}
-          <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          {/* CHART 1 (7 COLS): BAR CHART - UNITS DONATED BY REGION */}
+          <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-4">
+            <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base text-slate-900">Monthly Blood Donation Volume</h3>
-                <p className="text-xs text-slate-500">6-Month historical trend across verified collection drives</p>
+                <h3 className="font-bold text-base text-slate-900">Units Donated by Region</h3>
+                <p className="text-xs text-slate-500">Major state & district collection comparisons</p>
               </div>
-              <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                Peak: Mar 2026 (5,250u)
+              <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                Section 14 Data
               </span>
             </div>
 
-            {/* BAR VISUALIZER */}
-            <div className="h-56 pt-6 flex items-end justify-between gap-3 sm:gap-6 px-2">
-              {monthlyTimeline.map((item, idx) => (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
-                  <span className="text-[10px] font-mono font-bold text-slate-600">
-                    {item.units}u
-                  </span>
-                  <div
-                    className="w-full bg-gradient-to-t from-red-700 to-rose-500 rounded-t-xl hover:opacity-90 transition-all cursor-pointer shadow-xs"
-                    style={{ height: item.height }}
-                  />
-                  <span className="text-[10px] font-bold text-slate-500">{item.month}</span>
-                </div>
-              ))}
+            <div className="space-y-3 pt-2">
+              {regionalDonationMetrics.map((r) => {
+                const pct = Math.round((r.units / 5000) * 100);
+                return (
+                  <div key={r.city} className="space-y-1 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{r.city}</span>
+                        <span className="text-[11px] text-slate-400">({r.state})</span>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono">
+                        <span className="font-black text-slate-900">{r.units.toLocaleString()} Units</span>
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded text-[10px]">
+                          {r.change}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex">
+                      <div
+                        className="bg-gradient-to-r from-red-600 to-rose-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* CHART 2 (5 COLS): DONATIONS BY BLOOD GROUP DISTRIBUTION */}
+          {/* CHART 2 (5 COLS): DONUT/PIE VISUAL - DONATION BY BLOOD GROUP */}
           <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-4">
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-base text-slate-900">Donations by Blood Group</h3>
-              <p className="text-xs text-slate-500">Breakdown across all 8 blood component groups</p>
+              <h3 className="font-bold text-base text-slate-900">Donation Distribution by Blood Group</h3>
+              <p className="text-xs text-slate-500">Breakdown across all 8 component groups</p>
             </div>
 
             <div className="space-y-2.5">
@@ -244,135 +245,75 @@ export const GovernmentDonations = () => {
             </div>
           </div>
 
-          {/* CHART 3 (7 COLS): CITY DONATION RANKINGS */}
-          <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-4">
-            <div className="border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-base text-slate-900">Top Regional Collection Rankings</h3>
-              <p className="text-xs text-slate-500">Major metropolitan volume & active mobile donation camps</p>
+          {/* CHART 3 (12 COLS): MONTHLY DONATION TREND (LINE/BAR CHART) */}
+          <div className="lg:col-span-12 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Monthly Donation Trend</h3>
+                <p className="text-xs text-slate-500">Historical monthly collection trend across verified drives</p>
+              </div>
+              <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+                Current Peak: 5,250 Units / Month
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {cityDonationRankings.map((c, i) => (
-                <div
-                  key={c.city}
-                  className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-mono font-bold text-slate-500 text-[11px]">
-                      #{i + 1}
-                    </span>
-                    <div>
-                      <div className="font-bold text-slate-900">{c.city}</div>
-                      <div className="text-[10px] text-slate-400">{c.state} • {c.activeCamps} Camps</div>
-                    </div>
-                  </div>
-                  <span className="font-black text-slate-900 font-mono">{c.units.toLocaleString()}u</span>
+            {/* TIMELINE VISUALIZER */}
+            <div className="h-56 pt-6 flex items-end justify-between gap-4 sm:gap-8 px-4">
+              {monthlyTimeline.map((item, idx) => (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                  <span className="text-xs font-mono font-bold text-slate-700">
+                    {item.units.toLocaleString()}u
+                  </span>
+                  <div
+                    className="w-full bg-gradient-to-t from-red-700 to-rose-500 rounded-t-xl hover:opacity-90 transition-all cursor-pointer shadow-xs"
+                    style={{ height: item.height }}
+                  />
+                  <span className="text-xs font-bold text-slate-500">{item.month}</span>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* CHART 4 (5 COLS): EMERGENCY VS REGULAR BREAKDOWN */}
-          <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-5">
-            <div className="border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-base text-slate-900">Donation Type Channels</h3>
-              <p className="text-xs text-slate-500">Voluntary camps vs walk-in regular dispatches</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                <div className="flex justify-between text-xs font-bold text-slate-800">
-                  <span>Voluntary Public Camps</span>
-                  <span className="font-mono">14,200 Units (57%)</span>
-                </div>
-                <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: '57%' }} />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                <div className="flex justify-between text-xs font-bold text-slate-800">
-                  <span>Hospital Center Walk-In</span>
-                  <span className="font-mono">8,810 Units (35%)</span>
-                </div>
-                <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div className="bg-blue-500 h-full rounded-full" style={{ width: '35%' }} />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
-                <div className="flex justify-between text-xs font-bold text-rose-900">
-                  <span>Emergency SOS Dispatch</span>
-                  <span className="font-mono text-rose-700">1,840 Units (8%)</span>
-                </div>
-                <div className="w-full h-2.5 bg-rose-200 rounded-full overflow-hidden">
-                  <div className="bg-red-600 h-full rounded-full" style={{ width: '8%' }} />
-                </div>
-              </div>
             </div>
           </div>
 
         </div>
 
         {/* ======================================================== */}
-        {/* DONATION LOGS TABLE                                      */}
+        {/* DONATION ACTIVITY MAP / AREA TABLE (SECTION 15)          */}
         {/* ======================================================== */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden space-y-4 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="font-bold text-base text-slate-900">Verified Donation Event Log</h3>
-              <p className="text-xs text-slate-500">Live ledger of incoming blood collection records</p>
-            </div>
-            <span className="text-xs font-bold text-slate-500 font-mono">
-              Showing {filteredDonations.length} records
-            </span>
+        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-8 space-y-4">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="font-bold text-base text-slate-900">Donation Activity by Area</h3>
+            <p className="text-xs text-slate-500">
+              Aggregated statistics by region (No private donor identities exposed)
+            </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-4">Record ID</th>
-                  <th className="py-3 px-4">Donor Name</th>
-                  <th className="py-3 px-4">Blood Group</th>
-                  <th className="py-3 px-4">Units</th>
-                  <th className="py-3 px-4">Collection Center</th>
-                  <th className="py-3 px-4">City / State</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Channel</th>
-                  <th className="py-3 px-4 text-right">Status</th>
+                  <th className="py-3 px-4">Region / City Name</th>
+                  <th className="py-3 px-4">State</th>
+                  <th className="py-3 px-4">Total Donors</th>
+                  <th className="py-3 px-4">Total Units Donated</th>
+                  <th className="py-3 px-4">Most Donated Group</th>
+                  <th className="py-3 px-4 text-right">Activity Level</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                {filteredDonations.map((don) => (
-                  <tr key={don.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{don.id}</td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-800">{don.donorName}</td>
+                {regionalDonationMetrics.map((reg) => (
+                  <tr key={reg.city} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-slate-900">{reg.city}</td>
+                    <td className="py-3.5 px-4 text-slate-700">{reg.state}</td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{reg.donors.toLocaleString()} Donors</td>
+                    <td className="py-3.5 px-4 font-mono font-black text-red-600">+{reg.units.toLocaleString()} Units</td>
                     <td className="py-3.5 px-4">
-                      <span className="w-7 h-7 rounded-lg bg-red-50 text-red-700 font-black text-xs inline-flex items-center justify-center border border-red-200">
-                        {don.bloodGroup}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800">+{don.units}</td>
-                    <td className="py-3.5 px-4 text-slate-700">{don.centerName}</td>
-                    <td className="py-3.5 px-4 text-slate-500">{don.city}, {don.state}</td>
-                    <td className="py-3.5 px-4 font-mono text-slate-500 text-xs">{don.date}</td>
-                    <td className="py-3.5 px-4">
-                      <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                        {don.donationType}
+                      <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 font-bold border border-red-200 font-mono">
+                        {reg.topGroup}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          don.status === 'Stored'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : don.status === 'Dispatched'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {don.status}
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        High Activity
                       </span>
                     </td>
                   </tr>

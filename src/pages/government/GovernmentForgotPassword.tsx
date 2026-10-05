@@ -38,8 +38,8 @@ export const GovernmentForgotPassword = () => {
           </div>
 
           <button
-            onClick={() => navigate('/government/login')}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs sm:text-sm font-semibold transition-all"
+            onClick={() => navigate('/government/auth')}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Login</span>
@@ -76,13 +76,23 @@ export const GovernmentForgotPassword = () => {
                   </p>
                 </div>
 
-                <Link
-                  to="/government/login"
-                  className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back to Login</span>
-                </Link>
+                <div className="pt-2 space-y-2">
+                  <Link
+                    to="/government/reset-password"
+                    className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                  >
+                    <span>Proceed to Set New Password</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+
+                  <Link
+                    to="/government/auth"
+                    className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back to Login</span>
+                  </Link>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -106,7 +116,7 @@ export const GovernmentForgotPassword = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm tracking-wide shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-70"
+                  className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm tracking-wide shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-70 cursor-pointer"
                 >
                   {loading ? (
                     <>
@@ -123,7 +133,7 @@ export const GovernmentForgotPassword = () => {
 
                 <div className="text-center pt-2">
                   <Link
-                    to="/government/login"
+                    to="/government/auth"
                     className="text-xs text-slate-500 hover:text-slate-800 font-semibold inline-flex items-center gap-1"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />

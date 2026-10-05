@@ -191,8 +191,10 @@ export interface GovernmentUser {
   state: string;
   district: string;
   designation: string;
+  authorityId?: string;
   role: 'state_admin' | 'national_admin' | 'nodal_officer';
-  verifiedAt: string;
+  verificationStatus: 'Pending Verification' | 'Verified' | 'Pending Government Verification';
+  verifiedAt?: string;
 }
 
 export interface HospitalApplication {
@@ -210,6 +212,7 @@ export interface HospitalApplication {
   applicationDate: string;
   status: 'Pending' | 'Verified' | 'Rejected' | 'Under Review';
   rejectionReason?: string;
+  requestedInfoNote?: string;
   documents: { name: string; type: string; status: 'Verified' | 'Pending' | 'Uploaded'; url?: string }[];
   auditLog: { action: string; by: string; date: string; note?: string }[];
   stock?: Record<string, number>;
@@ -220,15 +223,22 @@ export interface BloodHotspot {
   id: string;
   city: string;
   state: string;
-  severity: 'Critical' | 'High' | 'Moderate' | 'Stable';
+  bloodGroup: string;
+  unitsRequired: number;
+  unitsAvailable: number;
   totalShortage: number;
-  patientsAffected: number;
+  emergencyRequests: number;
   hospitalsAffected: number;
+  patientsAffected: number;
+  severity: 'Critical' | 'High' | 'Moderate' | 'Stable';
+  aiShortageRisk: string; // e.g. "Critical — 92% (Demo Prediction)"
   mostRequiredGroup: string;
   bloodGroupShortages: Record<string, { required: number; available: number; urgency: 'Critical' | 'High' | 'Moderate' }>;
   urgencyWindow: string;
   lastUpdated: string;
   actionPlan?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface DonationRecord {
@@ -264,10 +274,12 @@ export interface GovernmentAlert {
   title: string;
   description: string;
   severity: 'critical' | 'warning' | 'info';
+  priority?: 'Critical' | 'High' | 'Medium' | 'Information';
   region: string;
   time: string;
   hotspotId?: string;
   hospitalId?: string;
   resolved: boolean;
 }
+
 

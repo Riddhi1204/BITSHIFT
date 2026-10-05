@@ -41,6 +41,7 @@ import { CitizenLayout } from './components/citizen/CitizenLayout';
 // Government Flow
 import { GovernmentAuth } from './pages/government/GovernmentAuth';
 import { GovernmentForgotPassword } from './pages/government/GovernmentForgotPassword';
+import { GovernmentResetPassword } from './pages/government/GovernmentResetPassword';
 import { GovernmentDashboard } from './pages/government/GovernmentDashboard';
 import { GovernmentHospitals } from './pages/government/GovernmentHospitals';
 import { GovernmentHospitalDetails } from './pages/government/GovernmentHospitalDetails';
@@ -48,6 +49,8 @@ import { GovernmentHotspots } from './pages/government/GovernmentHotspots';
 import { GovernmentDonations } from './pages/government/GovernmentDonations';
 import { GovernmentSupply } from './pages/government/GovernmentSupply';
 import { GovernmentReports } from './pages/government/GovernmentReports';
+import { GovernmentNotifications } from './pages/government/GovernmentNotifications';
+import { GovernmentProfile } from './pages/government/GovernmentProfile';
 import { GovernmentSettings } from './pages/government/GovernmentSettings';
 
 export function App() {
@@ -67,7 +70,7 @@ export function App() {
       return;
     }
     if (role === 'government') {
-      navigate('/government/login');
+      navigate('/government/auth');
       return;
     }
     if (role === 'citizen') {
@@ -151,9 +154,11 @@ export function App() {
         <Route path="/blood-bank/:bloodBankId/settings" element={<BloodBankSettings />} />
 
         {/* GOVERNMENT PORTAL FLOW */}
+        <Route path="/government/auth" element={<GovernmentAuth />} />
         <Route path="/government/login" element={<GovernmentAuth />} />
         <Route path="/government/register" element={<GovernmentAuth />} />
         <Route path="/government/forgot-password" element={<GovernmentForgotPassword />} />
+        <Route path="/government/reset-password" element={<GovernmentResetPassword />} />
         <Route path="/government/dashboard" element={<GovernmentDashboard />} />
         <Route path="/government/hospitals" element={<GovernmentHospitals />} />
         <Route path="/government/hospitals/:hospitalId" element={<GovernmentHospitalDetails />} />
@@ -161,6 +166,8 @@ export function App() {
         <Route path="/government/donations" element={<GovernmentDonations />} />
         <Route path="/government/supply" element={<GovernmentSupply />} />
         <Route path="/government/reports" element={<GovernmentReports />} />
+        <Route path="/government/notifications" element={<GovernmentNotifications />} />
+        <Route path="/government/profile" element={<GovernmentProfile />} />
         <Route path="/government/settings" element={<GovernmentSettings />} />
 
         {/* FALLBACK REDIRECT */}
