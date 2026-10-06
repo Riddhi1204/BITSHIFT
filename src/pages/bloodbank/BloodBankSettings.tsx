@@ -56,28 +56,28 @@ export const BloodBankSettings = () => {
           const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId || b.registrationNumber === bloodBankId);
           if (mock) {
             setBloodBank(mock);
-            setName(mock.name);
-            setCity(mock.city);
-            setState(mock.state);
-            setAddress(mock.address);
-            setPhone(mock.phone);
-            setEmail(mock.email);
-            setEmergencyContact(mock.emergencyContact);
-            setOperatingHours(mock.operatingHours);
+            setName(mock.name || '');
+            setCity(mock.city || '');
+            setState(mock.state || '');
+            setAddress(mock.address || '');
+            setPhone(mock.phone || '');
+            setEmail(mock.email || '');
+            setEmergencyContact(mock.emergencyContact || '');
+            setOperatingHours(mock.operatingHours || '24 Hours / 7 Days');
           }
         }
       } catch (err) {
         const mock = REGISTERED_BLOOD_BANKS.find((b) => b.id === bloodBankId || b.registrationNumber === bloodBankId);
         if (mock && isMounted) {
           setBloodBank(mock);
-          setName(mock.name);
-          setCity(mock.city);
-          setState(mock.state);
-          setAddress(mock.address);
-          setPhone(mock.phone);
-          setEmail(mock.email);
-          setEmergencyContact(mock.emergencyContact);
-          setOperatingHours(mock.operatingHours);
+          setName(mock.name || '');
+          setCity(mock.city || '');
+          setState(mock.state || '');
+          setAddress(mock.address || '');
+          setPhone(mock.phone || '');
+          setEmail(mock.email || '');
+          setEmergencyContact(mock.emergencyContact || '');
+          setOperatingHours(mock.operatingHours || '24 Hours / 7 Days');
         }
       } finally {
         if (isMounted) setLoading(false);

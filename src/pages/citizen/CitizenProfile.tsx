@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { User, Mail, Phone, MapPin, Calendar, Droplet, Edit2, Lock, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { authApi } from '../../services/authApi';
 
 export const CitizenProfile = () => {
   const navigate = useNavigate();
-  const { citizenUser, logoutCitizen, refreshAuth } = useAuth();
+  const { citizenUser, logoutCitizen } = useAuth();
   
   const [profile, setProfile] = useState({
     name: citizenUser?.name || 'Citizen User',
@@ -25,7 +26,7 @@ export const CitizenProfile = () => {
           const u = me.user;
           const cp = me.citizenProfile;
           setProfile({
-            name: u.fullName || u.name || citizenUser?.name || 'Citizen User',
+            name: u.fullName || citizenUser?.name || 'Citizen User',
             email: u.email || citizenUser?.email || '',
             phone: u.phone || citizenUser?.phone || 'Not provided',
             bloodGroup: u.bloodGroup || citizenUser?.bloodGroup || 'Not set',

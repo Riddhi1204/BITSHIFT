@@ -126,7 +126,7 @@ export const BloodBankCard = ({ bloodBank }: BloodBankCardProps) => {
               <BloodAvailabilityBadge
                 key={grp}
                 group={grp}
-                units={bloodBank.inventory[grp] ?? 0}
+                units={(bloodBank.inventory?.[grp] ?? bloodBank.stock?.[grp] ?? 0)}
                 compact
               />
             ))}

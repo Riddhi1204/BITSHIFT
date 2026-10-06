@@ -11,6 +11,9 @@ export interface BloodBankApiData {
   email?: string;
   operatingHours?: string;
   verificationStatus: string;
+  status?: string;
+  emergencyContact?: string;
+  lastUpdated?: string;
   inventory: Record<string, number>;
   totalUnits: number;
   verified: boolean;

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { REGISTERED_HOSPITALS } from '../../data/mockData';
 import { getHospitalDonorPledges, updatePledgeStatus } from '../../utils/hospitalDonorPledgeStore';
-import type { HospitalDonorPledge, Hospital } from '../../types';
+import type { HospitalDonorPledge } from '../../types';
 import { hospitalApi } from '../../services/hospitalApi';
 import { authApi } from '../../services/authApi';
 

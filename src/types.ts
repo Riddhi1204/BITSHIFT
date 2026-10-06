@@ -70,52 +70,66 @@ export interface HospitalPatientStats {
 }
 
 export interface Hospital {
-  id: string; // e.g. "HOS-001"
+  id: string; // e.g. "HOS-001" or UUID
   name: string; // e.g. "Raj Hospital"
+  registrationNumber?: string;
   city: string; // e.g. "Ranchi"
   state: string; // e.g. "Jharkhand"
   address: string;
   phone: string;
-  email: string;
-  emergencyContact: string;
-  status: 'verified' | 'active' | 'pending';
-  beds: number;
+  email?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  status?: 'verified' | 'active' | 'pending' | string;
+  verificationStatus?: string;
+  beds?: number;
   bedDetails?: HospitalBedStats;
-  bloodBankLinked: string;
+  bloodBankLinked?: string;
   linkedBloodBankId?: string;
-  icuCapacity: string;
-  stock: Record<string, number>;
+  icuCapacity?: string;
+  stock?: Record<string, number>;
+  totalStock?: number;
   logo?: string;
-  verifiedAt: string;
+  verifiedAt?: string;
   bloodRequirements?: Record<string, HospitalBloodGroupRequirement>;
   bloodRequests?: HospitalBloodRequestStats;
+  recentRequests?: any[];
   recentPublicRequests?: HospitalPublicRequest[];
   patientStats?: HospitalPatientStats;
+  inventories?: any[];
+  donations?: any[];
+  shortagePredictions?: any[];
 }
 
 export interface BloodBank {
-  id: string; // e.g. "BB-001"
+  id: string; // e.g. "BB-001" or UUID
   name: string; // e.g. "RIMS Blood Bank"
+  registrationNumber?: string;
   city: string;
   state: string;
   address: string;
   phone: string;
-  email: string;
-  status: 'operational' | 'maintenance' | 'temporarily_closed';
-  verified: boolean;
-  inventory: Record<string, number>; // "A+": 42, "A-": 12, etc.
+  email?: string;
+  status?: 'operational' | 'maintenance' | 'temporarily_closed' | string;
+  verificationStatus?: string;
+  verified?: boolean;
+  inventory?: Record<string, number>; // "A+": 42, "A-": 12, etc.
+  stock?: Record<string, number>;
   reservedStock?: Record<string, number>;
   expiredStock?: Record<string, number>;
-  totalUnits: number;
-  lastUpdated: string;
-  operatingHours: string;
-  emergencyContact: string;
+  totalUnits?: number;
+  totalStock?: number;
+  lastUpdated?: string;
+  operatingHours?: string;
+  emergencyContact?: string;
   distance?: string;
   adminEmail?: string;
   licenseNo?: string;
-  organizationType?: 'Government' | 'Charitable NGO' | 'Red Cross / Rotary' | 'Hospital Hub';
+  organizationType?: 'Government' | 'Charitable NGO' | 'Red Cross / Rotary' | 'Hospital Hub' | string;
   ngoPartner?: boolean;
   initiative?: string;
+  donations?: any[];
+  donationCampaigns?: any[];
 }
 
 export interface BloodDonation {

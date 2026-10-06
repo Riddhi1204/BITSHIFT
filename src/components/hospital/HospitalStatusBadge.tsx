@@ -1,7 +1,7 @@
 import { ShieldCheck, Activity, Clock } from 'lucide-react';
 
 interface HospitalStatusBadgeProps {
-  status: 'verified' | 'active' | 'pending';
+  status?: 'verified' | 'active' | 'pending' | string;
 }
 
 export const HospitalStatusBadge = ({ status }: HospitalStatusBadgeProps) => {

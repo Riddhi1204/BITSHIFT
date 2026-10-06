@@ -17,7 +17,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { GoogleSignInButton } from '../auth/GoogleSignInButton';
 import { authApi } from '../../services/authApi';
 
@@ -36,7 +36,6 @@ export const CitizenAuthModal = ({ isOpen, onClose, defaultTab = 'login' }: Citi
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const { loginCitizen } = useAuth();
-  const navigate = useNavigate();
 
   // Login Form State
   const [loginEmail, setLoginEmail] = useState('');

@@ -14,8 +14,7 @@ import {
   AlertCircle,
   Phone,
   Loader2,
-  Building2,
-  Lock
+  Building2
 } from 'lucide-react';
 import { BloodBankNav } from '../../components/bloodbank/BloodBankNav';
 import { getBloodGroupStatus } from '../../components/bloodbank/BloodAvailabilityBadge';

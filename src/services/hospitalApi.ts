@@ -11,6 +11,8 @@ export interface HospitalApiData {
   emergencyPhone?: string;
   email?: string;
   verificationStatus: string;
+  status?: string;
+  bloodBankLinked?: string;
   stock: Record<string, number>;
   totalStock: number;
   inventories?: any[];

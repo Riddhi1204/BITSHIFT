@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   History,
   Award,
-  Bell,
   Settings,
   LogOut,
   MapPin
